@@ -71,7 +71,9 @@ fi
 
 # Clean up
 echo "Cleaning up"
-rm -r build dist *.egg-info
+rm -r build dist
+find . -type d -name '__pycache__' -exec rm -r {} +
+find . -type d -name '*.egg-info' -exec rm -r {} +
 
 echo "Build successful"
 
