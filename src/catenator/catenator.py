@@ -1,35 +1,19 @@
 import os
 import argparse
 import fnmatch
+import time
+from threading import Timer
 
 import pyperclip
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
 
 class Catenator:
     DEFAULT_CODE_EXTENSIONS = [
-        "py",
-        "js",
-        "java",
-        "c",
-        "cpp",
-        "h",
-        "cs",
-        "rb",
-        "go",
-        "php",
-        "ts",
-        "swift",
-        "html",
-        "css",
-        "sql",
-        "sh",
-        "bash",
-        "ps1",
-        "R",
-        "scala",
-        "kt",
-        "rs",
-        "dart",
+        "py", "js", "java", "c", "cpp", "h", "cs", "rb", "go", "php",
+        "ts", "swift", "html", "css", "sql", "sh", "bash", "ps1",
+        "R", "scala", "kt", "rs", "dart",
     ]
     README_FILES = ["README", "README.md", "README.txt"]
     TOKENIZER = "cl100k_base"
@@ -45,9 +29,7 @@ class Catenator:
         title=None,
     ):
         self.directory = directory
-        self.include_extensions = (
-            include_extensions or self.DEFAULT_CODE_EXTENSIONS
-        )
+        self.include_extensions = include_extensions or self.DEFAULT_CODE_EXTENSIONS
         self.ignore_extensions = ignore_extensions or []
         self.include_tree = include_tree
         self.include_readme = include_readme
@@ -125,9 +107,7 @@ class Catenator:
                     continue
                 if file in self.README_FILES and self.include_readme:
                     continue
-                file_extension = os.path.splitext(file)[1][
-                    1:
-                ]  # Get extension without dot
+                file_extension = os.path.splitext(file)[1][1:]  # Get extension without dot
                 if (
                     file_extension in self.include_extensions
                     and file_extension not in self.ignore_extensions
@@ -173,6 +153,53 @@ class Catenator:
         )
 
 
+class CatenatorEventHandler(FileSystemEventHandler):
+    def __init__(self, catenator, output_file, cooldown=15):
+        self.catenator = catenator
+        self.output_file = os.path.abspath(output_file)
+        self.cooldown = cooldown
+        self.last_update = 0
+        self.update_timer = None
+
+    def on_created(self, event):
+        if not event.is_directory:
+            self.handle_write_event(event.src_path)
+
+    def on_modified(self, event):
+        if not event.is_directory:
+            self.handle_write_event(event.src_path)
+
+    def handle_write_event(self, file_path):
+        if os.path.abspath(file_path) == self.output_file:
+            return  # Ignore changes to the output file
+        if self.catenator.should_ignore(file_path):
+            return
+        print(f"Change detected: {file_path}")
+        self.schedule_update()
+
+    def schedule_update(self):
+        if self.update_timer:
+            self.update_timer.cancel()
+        
+        current_time = time.time()
+        time_since_last_update = current_time - self.last_update
+
+        if time_since_last_update < self.cooldown:
+            delay = self.cooldown - time_since_last_update
+        else:
+            delay = 0
+
+        self.update_timer = Timer(delay, self.update_output)
+        self.update_timer.start()
+
+    def update_output(self):
+        catenated_content = self.catenator.catenate()
+        with open(self.output_file, "w", encoding="utf-8") as f:
+            f.write(catenated_content)
+        print(f"Updated catenated content written to {self.output_file}")
+        self.last_update = time.time()
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Catenate code files in a directory."
@@ -208,6 +235,11 @@ def main():
         action="store_true",
         help="Count tokens in the catenated output",
     )
+    parser.add_argument(
+        "--watch",
+        action="store_true",
+        help="Watch for changes and update output file",
+    )
 
     args = parser.parse_args()
 
@@ -215,9 +247,23 @@ def main():
     catenated_content = catenator.catenate()
 
     if args.output:
-        with open(args.output, "w", encoding="utf-8") as f:
+        output_path = os.path.abspath(args.output)
+        with open(output_path, "w", encoding="utf-8") as f:
             f.write(catenated_content)
-        print(f"Catenated content written to {args.output}")
+        print(f"Catenated content written to {output_path}")
+
+        if args.watch:
+            print(f"Watching for changes in {args.directory}...")
+            event_handler = CatenatorEventHandler(catenator, output_path, cooldown=15)
+            observer = Observer()
+            observer.schedule(event_handler, args.directory, recursive=True)
+            observer.start()
+            try:
+                while True:
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                observer.stop()
+            observer.join()
     elif args.clipboard:
         pyperclip.copy(catenated_content)
         print("Catenated content copied to clipboard")

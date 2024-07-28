@@ -9,7 +9,7 @@ Catenator is a Python tool for concatenating code files in a directory into a si
 - Include a directory tree structure
 - Include README files in the output
 - Output to file, clipboard, or stdout
-- .gitignore-style .catignore files
+- gitignore-style .catignore files
 
 ## Installation
 
@@ -35,6 +35,8 @@ Options:
 - `--include EXTENSIONS`: Comma-separated list of file extensions to include (replaces defaults)
 - `--ignore EXTENSIONS`: Comma-separated list of file extensions to ignore
 - `--count-tokens`: Output approximation of how many tokens in output (tiktoken cl100k_base)
+- `--watch`: Watch for changes and update output file automatically (requires --output)
+
 
 Example:
 ```
