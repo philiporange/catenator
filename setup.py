@@ -1,5 +1,11 @@
 from setuptools import setup, find_packages
-from src.catenator.__init__ import __version__, __project__, __author__, __email__
+from src.catenator.__init__ import (
+    __version__,
+    __project__,
+    __author__,
+    __email__,
+    __description__,
+)
 
 
 with open("README.md", "r", encoding="utf-8") as fh:
@@ -10,7 +16,7 @@ setup(
     version=__version__,
     author=__author__,
     author_email=__email__,
-    description="A Python tool for concatenating code.",
+    description=__description__,
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/philiporange/catenator",

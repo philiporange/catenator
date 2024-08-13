@@ -11,9 +11,29 @@ from watchdog.events import FileSystemEventHandler
 
 class Catenator:
     DEFAULT_CODE_EXTENSIONS = [
-        "py", "js", "java", "c", "cpp", "h", "cs", "rb", "go", "php",
-        "ts", "swift", "html", "css", "sql", "sh", "bash", "ps1",
-        "R", "scala", "kt", "rs", "dart",
+        "py",
+        "js",
+        "java",
+        "c",
+        "cpp",
+        "h",
+        "cs",
+        "rb",
+        "go",
+        "php",
+        "ts",
+        "swift",
+        "html",
+        "css",
+        "sql",
+        "sh",
+        "bash",
+        "ps1",
+        "R",
+        "scala",
+        "kt",
+        "rs",
+        "dart",
     ]
     README_FILES = ["README", "README.md", "README.txt"]
     TOKENIZER = "cl100k_base"
@@ -27,14 +47,18 @@ class Catenator:
         include_tree=True,
         include_readme=True,
         title=None,
+        ignore_tests=False,
     ):
         self.directory = directory
-        self.include_extensions = include_extensions or self.DEFAULT_CODE_EXTENSIONS
+        self.include_extensions = (
+            include_extensions or self.DEFAULT_CODE_EXTENSIONS
+        )
         self.ignore_extensions = ignore_extensions or []
         self.include_tree = include_tree
         self.include_readme = include_readme
         self.title = title or os.path.basename(os.path.abspath(directory))
         self.ignore_patterns = self.load_cat_ignore()
+        self.ignore_tests = ignore_tests
 
     def load_cat_ignore(self):
         ignore_file = os.path.join(self.directory, self.CATIGNORE_FILENAME)
@@ -49,6 +73,14 @@ class Catenator:
 
     def should_ignore(self, path):
         rel_path = os.path.relpath(path, self.directory)
+
+        # Check if we should ignore test files/directories
+        if self.ignore_tests:
+            if rel_path.startswith("tests/") or os.path.basename(
+                rel_path
+            ).startswith("test_"):
+                return True
+
         for pattern in self.ignore_patterns:
             if pattern.endswith("/"):
                 if fnmatch.fnmatch(
@@ -107,7 +139,9 @@ class Catenator:
                     continue
                 if file in self.README_FILES and self.include_readme:
                     continue
-                file_extension = os.path.splitext(file)[1][1:]  # Get extension without dot
+                file_extension = os.path.splitext(file)[1][
+                    1:
+                ]  # Get extension without dot
                 if (
                     file_extension in self.include_extensions
                     and file_extension not in self.ignore_extensions
@@ -150,6 +184,7 @@ class Catenator:
             include_tree=not args.no_tree,
             include_readme=not args.no_readme,
             title=args.title,
+            ignore_tests=args.ignore_tests,
         )
 
 
@@ -180,7 +215,7 @@ class CatenatorEventHandler(FileSystemEventHandler):
     def schedule_update(self):
         if self.update_timer:
             self.update_timer.cancel()
-        
+
         current_time = time.time()
         time_since_last_update = current_time - self.last_update
 
@@ -240,6 +275,11 @@ def main():
         action="store_true",
         help="Watch for changes and update output file",
     )
+    parser.add_argument(
+        "--ignore-tests",
+        action="store_true",
+        help="Ignore 'tests/' directory and files starting with 'test_'",
+    )
 
     args = parser.parse_args()
 
@@ -254,7 +294,9 @@ def main():
 
         if args.watch:
             print(f"Watching for changes in {args.directory}...")
-            event_handler = CatenatorEventHandler(catenator, output_path, cooldown=15)
+            event_handler = CatenatorEventHandler(
+                catenator, output_path, cooldown=15
+            )
             observer = Observer()
             observer.schedule(event_handler, args.directory, recursive=True)
             observer.start()

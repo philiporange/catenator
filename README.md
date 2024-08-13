@@ -36,6 +36,7 @@ Options:
 - `--ignore EXTENSIONS`: Comma-separated list of file extensions to ignore
 - `--count-tokens`: Output approximation of how many tokens in output (tiktoken cl100k_base)
 - `--watch`: Watch for changes and update output file automatically (requires --output)
+- `--ignore-tests`: Leave out tests from the concatenated output
 
 
 Example:
