@@ -20,7 +20,8 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/philiporange/catenator",
-    packages=find_packages(),
+    packages=find_packages(where="src"),
+    package_dir={"": "src"},
     install_requires=[
         "pyperclip",
     ],
@@ -29,7 +30,7 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "catenator=src.catenator.catenator:main",
+            "catenator=catenator.catenator:main",
         ],
     },
     classifiers=[
