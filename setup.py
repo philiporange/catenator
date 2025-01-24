@@ -24,6 +24,7 @@ setup(
     package_dir={"": "src"},
     install_requires=[
         "pyperclip",
+        "watchdog",
     ],
     extras_require={
         "token_counting": ["tiktoken"],

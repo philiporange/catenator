@@ -34,6 +34,7 @@ class Catenator:
         "kt",
         "rs",
         "dart",
+        "md",
     ]
     README_FILES = ["README", "README.md", "README.txt"]
     TOKENIZER = "cl100k_base"
@@ -48,6 +49,7 @@ class Catenator:
         include_readme=True,
         title=None,
         ignore_tests=False,
+        include_hidden=False,
     ):
         self.directory = directory
         self.include_extensions = (
@@ -59,20 +61,42 @@ class Catenator:
         self.title = title or os.path.basename(os.path.abspath(directory))
         self.ignore_patterns = self.load_cat_ignore()
         self.ignore_tests = ignore_tests
+        self.include_hidden = include_hidden
 
     def load_cat_ignore(self):
         ignore_file = os.path.join(self.directory, self.CATIGNORE_FILENAME)
-        if os.path.exists(ignore_file):
-            with open(ignore_file, "r") as f:
-                return [
-                    line.strip()
-                    for line in f
-                    if line.strip() and not line.startswith("#")
-                ]
-        return []
+        if os.path.isfile(ignore_file):
+            # If a local .catignore exists, use it
+            with open(ignore_file, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+        else:
+            # Fallback to default.catignore if it exists
+            default_ignore_path = os.path.join(
+                os.path.dirname(__file__),
+                "default.catignore"
+            )
+            if os.path.isfile(default_ignore_path):
+                with open(default_ignore_path, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+            else:
+                # No local .catignore and no default.catignore found
+                return []
+
+        return [
+            line.strip()
+            for line in lines
+            if line.strip() and not line.startswith("#")
+        ]
 
     def should_ignore(self, path):
         rel_path = os.path.relpath(path, self.directory)
+
+        # Ignore hidden files/directories if not self.include_hidden
+        if not self.include_hidden:
+            parts = rel_path.split(os.sep)
+            for part in parts:
+                if part.startswith("."):
+                    return True
 
         # Check if we should ignore test files/directories
         if self.ignore_tests:
@@ -81,14 +105,14 @@ class Catenator:
             ).startswith("test_"):
                 return True
 
+        # Apply patterns from .catignore
         for pattern in self.ignore_patterns:
             if pattern.endswith("/"):
-                if fnmatch.fnmatch(
-                    rel_path + "/", pattern
-                ) or rel_path.startswith(pattern):
+                if fnmatch.fnmatch(rel_path + "/", pattern) or rel_path.startswith(pattern):
                     return True
             elif fnmatch.fnmatch(rel_path, pattern):
                 return True
+
         return False
 
     def generate_directory_tree(self):
@@ -122,9 +146,7 @@ class Catenator:
         if self.include_readme:
             for readme_file in self.README_FILES:
                 readme_path = os.path.join(self.directory, readme_file)
-                if os.path.exists(readme_path) and not self.should_ignore(
-                    readme_path
-                ):
+                if os.path.exists(readme_path) and not self.should_ignore(readme_path):
                     with open(readme_path, "r", encoding="utf-8") as f:
                         readme_content = f.read()
                     result.append(f"# {readme_file}\n\n{readme_content}\n\n")
@@ -139,9 +161,7 @@ class Catenator:
                     continue
                 if file in self.README_FILES and self.include_readme:
                     continue
-                file_extension = os.path.splitext(file)[1][
-                    1:
-                ]  # Get extension without dot
+                file_extension = os.path.splitext(file)[1][1:]
                 if (
                     file_extension in self.include_extensions
                     and file_extension not in self.ignore_extensions
@@ -185,6 +205,7 @@ class Catenator:
             include_readme=not args.no_readme,
             title=args.title,
             ignore_tests=args.ignore_tests,
+            include_hidden=args.include_hidden,
         )
 
 
@@ -279,6 +300,11 @@ def main():
         "--ignore-tests",
         action="store_true",
         help="Ignore 'tests/' directory and files starting with 'test_'",
+    )
+    parser.add_argument(
+        "--include-hidden",
+        action="store_true",
+        help="Include hidden files (starting with '.') in the output",
     )
 
     args = parser.parse_args()

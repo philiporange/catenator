@@ -9,13 +9,13 @@ TESTS_DIR="$PROJECT_DIR/tests"
 
 BLACK=black
 BLACK_OPTS="--line-length 79"
-LINTER=/usr/bin/flake8
+LINTER=flake8
 GITIGNORE_URL="https://raw.githubusercontent.com/github/gitignore/main/Python.gitignore"
 
 # Update .gitignore if older than 30 days
 GITIGNORE_PATH="$PROJECT_DIR/.gitignore"
 if [ ! -f $GITIGNORE_PATH ] || [ `find $GITIGNORE_PATH -mtime +30` ]; then
-    echo "Updating .gitignore" 
+    echo "Updating .gitignore"
     wget -O $GITIGNORE_PATH $GITIGNORE_URL 2>/dev/null
 fi
 # Don't allow cats in the repo
