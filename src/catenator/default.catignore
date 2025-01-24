@@ -2,6 +2,9 @@
 # default.catignore
 # --------------------------
 
+# Self output
+cat.md
+
 # -------------------------------------------------------------------
 # Python Bytecode
 __pycache__/
