@@ -72,8 +72,7 @@ class Catenator:
         else:
             # Fallback to default.catignore if it exists
             default_ignore_path = os.path.join(
-                os.path.dirname(__file__),
-                "default.catignore"
+                os.path.dirname(__file__), "default.catignore"
             )
             if os.path.isfile(default_ignore_path):
                 with open(default_ignore_path, "r", encoding="utf-8") as f:
@@ -91,12 +90,17 @@ class Catenator:
     def should_ignore(self, path):
         rel_path = os.path.relpath(path, self.directory)
 
-        # Ignore hidden files/directories if not self.include_hidden
+        # Never ignore the top-level directory itself
+        if rel_path == ".":
+            return False
+
+        # Ignore __pycache__ and hidden files/directories
         if not self.include_hidden:
             parts = rel_path.split(os.sep)
-            for part in parts:
-                if part.startswith("."):
-                    return True
+            if any(
+                part.startswith(".") or part == "__pycache__" for part in parts
+            ):
+                return True
 
         # Check if we should ignore test files/directories
         if self.ignore_tests:
@@ -108,7 +112,9 @@ class Catenator:
         # Apply patterns from .catignore
         for pattern in self.ignore_patterns:
             if pattern.endswith("/"):
-                if fnmatch.fnmatch(rel_path + "/", pattern) or rel_path.startswith(pattern):
+                if fnmatch.fnmatch(
+                    rel_path + "/", pattern
+                ) or rel_path.startswith(pattern):
                     return True
             elif fnmatch.fnmatch(rel_path, pattern):
                 return True
@@ -129,7 +135,12 @@ class Catenator:
                 tree.append(f"{indent}{os.path.basename(root)}/")
                 for file in files:
                     if not self.should_ignore(os.path.join(root, file)):
-                        tree.append(f"{indent}│   {file}")
+                        # Skip README files if include_readme is False
+                        if (
+                            self.include_readme
+                            or file not in self.README_FILES
+                        ):
+                            tree.append(f"{indent}│   {file}")
         return "\n".join(tree)
 
     def catenate(self):
@@ -146,7 +157,9 @@ class Catenator:
         if self.include_readme:
             for readme_file in self.README_FILES:
                 readme_path = os.path.join(self.directory, readme_file)
-                if os.path.exists(readme_path) and not self.should_ignore(readme_path):
+                if os.path.exists(readme_path) and not self.should_ignore(
+                    readme_path
+                ):
                     with open(readme_path, "r", encoding="utf-8") as f:
                         readme_content = f.read()
                     result.append(f"# {readme_file}\n\n{readme_content}\n\n")

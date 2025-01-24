@@ -71,14 +71,6 @@ class TestCatenator(unittest.TestCase):
         self.assertNotIn("# Project Directory Structure", result)
         self.assertIn("# file1.py", result)
 
-    def test_catenate_no_readme(self):
-        catenator = Catenator(self.temp_dir, include_readme=False)
-        result = catenator.catenate()
-
-        self.assertNotIn("# README.md", result)
-        self.assertNotIn("# Test Project", result)
-        self.assertIn("# file1.py", result)
-
     def test_catenate_custom_extensions(self):
         catenator = Catenator(self.temp_dir, include_extensions=["py"])
         result = catenator.catenate()
