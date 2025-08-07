@@ -3,6 +3,7 @@ import argparse
 import fnmatch
 import time
 from threading import Timer
+import yaml
 
 import pyperclip
 from watchdog.observers import Observer
@@ -39,6 +40,7 @@ class Catenator:
     README_FILES = ["README", "README.md", "README.txt"]
     TOKENIZER = "cl100k_base"
     CATIGNORE_FILENAME = ".catignore"
+    CATCONFIG_FILENAME = ".catconfig.yaml"
 
     def __init__(
         self,
@@ -50,6 +52,7 @@ class Catenator:
         title=None,
         ignore_tests=False,
         include_hidden=False,
+        build_config=None,
     ):
         self.directory = directory
         self.include_extensions = (
@@ -62,6 +65,7 @@ class Catenator:
         self.ignore_patterns = self.load_cat_ignore()
         self.ignore_tests = ignore_tests
         self.include_hidden = include_hidden
+        self.build_config = build_config or {}
 
     def load_cat_ignore(self):
         ignore_file = os.path.join(self.directory, self.CATIGNORE_FILENAME)
@@ -92,6 +96,38 @@ class Catenator:
 
         # Never ignore the top-level directory itself
         if rel_path == ".":
+            return False
+
+        if self.build_config:
+            whitelist = self.build_config.get("whitelist", [])
+            blacklist = self.build_config.get("blacklist", [])
+
+            # Check blacklist first
+            for pattern in blacklist:
+                if pattern.endswith("/"):
+                    if fnmatch.fnmatch(
+                        rel_path + "/", pattern
+                    ) or rel_path.startswith(pattern):
+                        return True
+                elif fnmatch.fnmatch(rel_path, pattern):
+                    return True
+
+            # If whitelist is defined, only include paths that match
+            if whitelist:
+                is_whitelisted = False
+                for pattern in whitelist:
+                    if pattern.endswith("/"):
+                        if fnmatch.fnmatch(
+                            rel_path + "/", pattern
+                        ) or rel_path.startswith(pattern):
+                            is_whitelisted = True
+                            break
+                    elif fnmatch.fnmatch(rel_path, pattern):
+                        is_whitelisted = True
+                        break
+                if not is_whitelisted:
+                    return True
+
             return False
 
         # Ignore __pycache__ and hidden files/directories
@@ -203,7 +239,7 @@ class Catenator:
         return len(tokens)
 
     @classmethod
-    def from_cli_args(cls, args):
+    def from_cli_args(cls, args, build_config=None):
         return cls(
             directory=args.directory,
             include_extensions=(
@@ -219,6 +255,7 @@ class Catenator:
             title=args.title,
             ignore_tests=args.ignore_tests,
             include_hidden=args.include_hidden,
+            build_config=build_config,
         )
 
 
@@ -319,10 +356,38 @@ def main():
         action="store_true",
         help="Include hidden files (starting with '.') in the output",
     )
+    parser.add_argument(
+        "--build",
+        type=str,
+        help="Name of the build to use from .catconfig.yaml",
+    )
 
     args = parser.parse_args()
 
-    catenator = Catenator.from_cli_args(args)
+    build_config = {}
+    if args.build:
+        config_path = os.path.join(args.directory, Catenator.CATCONFIG_FILENAME)
+        if os.path.isfile(config_path):
+            with open(config_path, "r", encoding="utf-8") as f:
+                try:
+                    config = yaml.safe_load(f)
+                    if (
+                        config
+                        and "builds" in config
+                        and args.build in config["builds"]
+                    ):
+                        build_config = config["builds"][args.build]
+                        print(f"Using build '{args.build}' from {config_path}")
+                    else:
+                        print(
+                            f"Warning: Build '{args.build}' not found in {config_path}"
+                        )
+                except yaml.YAMLError as e:
+                    print(f"Error parsing {config_path}: {e}")
+        else:
+            print(f"Warning: Config file {config_path} not found.")
+
+    catenator = Catenator.from_cli_args(args, build_config=build_config)
     catenated_content = catenator.catenate()
 
     if args.output:

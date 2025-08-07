@@ -193,6 +193,36 @@ class TestCatenator(unittest.TestCase):
         self.assertIn("ignored_dir", result)
         self.assertIn("file4.py", result)
 
+    def test_catenate_with_build_config(self):
+        # The config loading logic is in main(), so we simulate it here
+        # by creating the build_config dictionary manually.
+        build_config = {
+            "whitelist": ["file1.py", "subdir/"],
+            "blacklist": ["file2.js"],
+        }
+
+        # Create a file in subdir to test directory whitelisting
+        with open(os.path.join(self.temp_dir, "subdir", "file4.py"), "w") as f:
+            f.write("print('Hello from file4')")
+
+        catenator = Catenator(self.temp_dir, build_config=build_config)
+        result = catenator.catenate()
+
+        self.assertIn("# file1.py", result)
+        self.assertIn("print('Hello from file1')", result)
+
+        self.assertIn("# subdir/file3.py", result)
+        self.assertIn("print('Hello from file3')", result)
+
+        self.assertIn("# subdir/file4.py", result)
+        self.assertIn("print('Hello from file4')", result)
+
+        # file2.js is in the blacklist
+        self.assertNotIn("# file2.js", result)
+
+        # ignored_file.txt is not in the whitelist
+        self.assertNotIn("ignored_file.txt", result)
+
 
 if __name__ == "__main__":
     unittest.main()

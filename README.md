@@ -82,6 +82,42 @@ ignored_file.txt
 ignored_dir/
 ```
 
+## .catconfig.yaml for Custom Builds
+
+For more complex configurations, you can define custom "builds" in a `.catconfig.yaml` file in your project's root directory. This allows you to specify multiple sets of whitelisted and blacklisted files.
+
+### `--build` Option
+
+To use a build, use the `--build` command-line option:
+```
+catenator /path/to/your/project --build <build_name>
+```
+
+When you use the `--build` option, the catenator will ignore `.catignore` and other filtering flags, and will instead rely solely on the `whitelist` and `blacklist` defined in the specified build.
+
+### Example `.catconfig.yaml`
+
+Here is an example of a `.catconfig.yaml` file with two builds, `frontend` and `backend`:
+```yaml
+builds:
+  frontend:
+    whitelist:
+      - "src/frontend/"
+      - "README.md"
+    blacklist:
+      - "src/frontend/node_modules/"
+  backend:
+    whitelist:
+      - "src/backend/"
+      - "requirements.txt"
+    blacklist:
+      - "*.log"
+```
+
+In this example:
+- `catenator . --build frontend` will concatenate all files in `src/frontend/` (except `node_modules`) and the `README.md` file.
+- `catenator . --build backend` will concatenate all files in `src/backend/` and the `requirements.txt` file, excluding any `.log` files.
+
 ## License
 
 This project is licensed under the Creative Commons Zero v1.0 Universal (CC0-1.0) License.
