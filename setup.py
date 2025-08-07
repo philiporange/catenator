@@ -25,6 +25,7 @@ setup(
     install_requires=[
         "pyperclip",
         "watchdog",
+        "pyyaml",
     ],
     extras_require={
         "token_counting": ["tiktoken"],
