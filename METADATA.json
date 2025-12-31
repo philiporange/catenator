@@ -1,0 +1,62 @@
+{
+  "name": "catenator",
+  "short_description": "A Python tool for concatenating code files from a directory into a single output string.",
+  "long_description": "Catenator is a command-line utility and Python library that concatenates code files from a specified directory into a single output string. It supports multiple programming languages, can generate directory tree structures, include README files, and filter files using gitignore-style .catignore patterns or YAML-based build configurations. It provides options for clipboard output, file watching, token counting, and flexible inclusion/exclusion of file types. Useful for preparing codebases for analysis by language models, documentation generation, or code review.",
+  "keywords": [
+    "code-concatenation",
+    "cli-tool",
+    "python-library",
+    "code-analysis",
+    "file-aggregation",
+    "directory-processing",
+    "developer-tool",
+    "code-documentation",
+    "pattern-matching",
+    "token-counting",
+    "file-watching",
+    "multifile-processing"
+  ],
+  "primary_language": "Python",
+  "languages": [
+    "Python"
+  ],
+  "frameworks": [
+    "argparse",
+    "watchdog",
+    "PyYAML",
+    "pyperclip",
+    "tiktoken"
+  ],
+  "modules": [
+    {
+      "path": "src/catenator/__init__.py",
+      "description": "Package initialization that exports the Catenator class and defines project metadata (version, author, description)."
+    },
+    {
+      "path": "src/catenator/catenator.py",
+      "description": "Core module containing the Catenator class and CLI implementation for concatenating code files with filtering, tree generation, file watching, and token counting capabilities."
+    },
+    {
+      "path": "tests/test_catenator.py",
+      "description": "Unit tests covering default concatenation, tree generation, extension filtering, .catignore parsing, build configurations, and token counting."
+    },
+    {
+      "path": "setup.py",
+      "description": "Package setup configuration defining dependencies (pyperclip, watchdog, pyyaml, tiktoken), entry points, and distribution metadata."
+    }
+  ],
+  "git": {
+    "is_repo": true,
+    "remote_url": "https://github.com/philiporange/catenator.git",
+    "github_name": "philiporange/catenator",
+    "default_branch": "main",
+    "last_commit": "2025-08-07T13:33:08+01:00"
+  },
+  "stats": {
+    "files": 10,
+    "lines_of_code": 787,
+    "size_bytes": 40688
+  },
+  "generated_at": "2025-12-06T22:39:16.161466",
+  "generator_version": "1.0.0"
+}
