@@ -54,6 +54,17 @@ yarn-error.log
 .pnpm-debug.log
 
 # -------------------------------------------------------------------
+# Android
+.gradle/
+.kotlin/
+*.apk
+*.aab
+*.dex
+*.class
+*.ap_
+local.properties
+
+# -------------------------------------------------------------------
 # Misc
 .env
 .env.*
