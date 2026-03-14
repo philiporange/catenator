@@ -6,15 +6,16 @@
 cat.md
 
 # -------------------------------------------------------------------
-# Python Bytecode
+# Version Control
+.git/
+
+# -------------------------------------------------------------------
+# Python
 __pycache__/
 */__pycache__/
 *.py[cod]
 *.pyd
 *.so
-
-# -------------------------------------------------------------------
-# Python Environments
 .venv/
 venv/
 env/
@@ -23,22 +24,168 @@ ENV/
 .eggs/
 build/
 dist/
-
-# -------------------------------------------------------------------
-# Test / Coverage
 .coverage
 coverage/
+htmlcov/
 .tox/
 .mypy_cache/
 .pytest_cache/
+.ruff_cache/
+Pipfile.lock
+poetry.lock
+uv.lock
 
 # -------------------------------------------------------------------
-# OS / Editor Directories & Files
+# Node & Web
+node_modules/
+bower_components/
+npm-debug.log
+yarn-error.log
+.pnpm-debug.log
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+.next/
+.nuxt/
+.output/
+.cache/
+.parcel-cache/
+*.min.js
+*.min.css
+*.bundle.js
+*.chunk.js
+*.map
+
+# -------------------------------------------------------------------
+# Java / Kotlin / JVM
+.gradle/
+.kotlin/
+target/
+*.jar
+*.war
+*.ear
+*.class
+*.ap_
+
+# -------------------------------------------------------------------
+# C / C++
+*.o
+*.obj
+*.exe
+*.dll
+*.lib
+*.a
+*.dylib
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+
+# -------------------------------------------------------------------
+# Rust
+target/
+Cargo.lock
+
+# -------------------------------------------------------------------
+# Go
+vendor/
+go.sum
+
+# -------------------------------------------------------------------
+# .NET / C#
+bin/
+obj/
+*.nupkg
+
+# -------------------------------------------------------------------
+# Ruby
+Gemfile.lock
+vendor/bundle/
+
+# -------------------------------------------------------------------
+# PHP
+composer.lock
+vendor/
+
+# -------------------------------------------------------------------
+# iOS / Xcode
+DerivedData/
+Pods/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+xcuserdata/
+
+# -------------------------------------------------------------------
+# Android
+*.apk
+*.aab
+*.dex
+local.properties
+
+# -------------------------------------------------------------------
+# Images / Media
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.ico
+*.webp
+*.svg
+*.mp3
+*.mp4
+*.avi
+*.mov
+*.wav
+*.flac
+*.ogg
+*.webm
+
+# -------------------------------------------------------------------
+# Fonts
+*.ttf
+*.otf
+*.woff
+*.woff2
+*.eot
+
+# -------------------------------------------------------------------
+# Archives
+*.zip
+*.tar
+*.gz
+*.bz2
+*.rar
+*.7z
+*.tgz
+
+# -------------------------------------------------------------------
+# Documents / Binary
+*.pdf
+*.doc
+*.docx
+*.xls
+*.xlsx
+*.ppt
+*.pptx
+
+# -------------------------------------------------------------------
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# -------------------------------------------------------------------
+# OS / Editor Files
 .DS_Store
 Thumbs.db
+desktop.ini
 .idea/
 .vscode/
 *.swp
+*.swo
+*~
 
 # -------------------------------------------------------------------
 # Logs
@@ -47,22 +194,11 @@ Thumbs.db
 *.err
 
 # -------------------------------------------------------------------
-# Node & Web
-node_modules/
-npm-debug.log
-yarn-error.log
-.pnpm-debug.log
-
-# -------------------------------------------------------------------
-# Android
-.gradle/
-.kotlin/
-*.apk
-*.aab
-*.dex
-*.class
-*.ap_
-local.properties
+# Infrastructure / DevOps
+.terraform/
+*.tfstate
+*.tfstate.backup
+.serverless/
 
 # -------------------------------------------------------------------
 # Misc
@@ -70,3 +206,5 @@ local.properties
 .env.*
 wandb/
 *.pth
+*.pickle
+*.pkl
