@@ -1,12 +1,25 @@
+import re
 from setuptools import setup, find_packages
-from src.catenator.__init__ import (
-    __version__,
-    __project__,
-    __author__,
-    __email__,
-    __description__,
-)
 
+
+def get_metadata():
+    """Read metadata from __init__.py without importing the package."""
+    with open("src/catenator/__init__.py", "r", encoding="utf-8") as f:
+        content = f.read()
+    metadata = {}
+    for key in ["__version__", "__project__", "__author__", "__email__", "__description__"]:
+        match = re.search(rf'^{key}\s*=\s*["\']([^"\']+)["\']', content, re.MULTILINE)
+        if match:
+            metadata[key] = match.group(1)
+    return metadata
+
+
+metadata = get_metadata()
+__version__ = metadata["__version__"]
+__project__ = metadata["__project__"]
+__author__ = metadata["__author__"]
+__email__ = metadata["__email__"]
+__description__ = metadata["__description__"]
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
@@ -29,6 +42,7 @@ setup(
     ],
     extras_require={
         "token_counting": ["tiktoken"],
+        "summarize": ["tiktoken", "robot"],
     },
     entry_points={
         "console_scripts": [

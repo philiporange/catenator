@@ -37,7 +37,8 @@ Options:
 - `--count-tokens`: Output approximation of how many tokens in output (tiktoken cl100k_base)
 - `--watch`: Watch for changes and update output file automatically (requires --output)
 - `--ignore-tests`: Leave out tests from the concatenated output
-
+- `--token-limit N`: Keep output under N tokens by summarizing least important files
+- `--llm`: Use AI for richer summaries when using --token-limit (requires robot module)
 
 Example:
 ```
@@ -117,6 +118,29 @@ builds:
 In this example:
 - `catenator . --build frontend` will concatenate all files in `src/frontend/` (except `node_modules`) and the `README.md` file.
 - `catenator . --build backend` will concatenate all files in `src/backend/` and the `requirements.txt` file, excluding any `.log` files.
+
+## Token Limit and Summarization
+
+When a project exceeds a specified token limit, catenator uses a progressive approach to fit within the budget:
+
+```
+catenator /path/to/project --token-limit 10000
+```
+
+This will:
+1. Rank all files by importance to understanding the project
+2. Include full content for the most important files
+3. Add summaries for less important files until 90% of budget is used
+4. Add just docstrings for remaining files until 100% of budget
+5. Truncate if still over the limit
+
+By default, summaries are structural extracts (function/class signatures and docstrings). For richer AI-generated summaries, add the `--llm` flag:
+
+```
+catenator /path/to/project --token-limit 10000 --llm
+```
+
+Files are labeled in the output: `(summary)` for summarized files, `(docstring)` for docstring-only files. Summaries are cached in `~/.catenator/summaries/`. Token counting requires tiktoken; AI summaries require the `robot` module.
 
 ## License
 

@@ -1,3 +1,13 @@
+"""
+Catenator concatenates source code files from a project into a single output.
+
+When --token-limit is specified, uses a progressive approach to fit within the
+budget: full content for most important files, then summaries until 90% budget,
+then docstrings until 100%, then truncates if needed. Summaries use signature
+extraction by default; --llm flag enables AI summaries (via robot module).
+Summaries are cached in ~/.catenator/summaries/ for reuse.
+"""
+
 import os
 import argparse
 import fnmatch
@@ -179,8 +189,48 @@ class Catenator:
                             tree.append(f"{indent}│   {file}")
         return "\n".join(tree)
 
-    def catenate(self):
+    def collect_files(self):
+        """
+        Collect all files that would be included in the output.
+
+        Returns:
+            List of (relative_path, absolute_path, content) tuples
+        """
+        files = []
+        for root, _, filenames in os.walk(self.directory):
+            if self.should_ignore(root):
+                continue
+            for filename in filenames:
+                file_path = os.path.join(root, filename)
+                if self.should_ignore(file_path):
+                    continue
+                if filename in self.README_FILES and self.include_readme:
+                    continue
+                file_extension = os.path.splitext(filename)[1][1:]
+                if (
+                    file_extension in self.include_extensions
+                    and file_extension not in self.ignore_extensions
+                ):
+                    relative_path = os.path.relpath(file_path, self.directory)
+                    try:
+                        with open(file_path, "r", encoding="utf-8") as f:
+                            content = f.read()
+                        files.append((relative_path, file_path, content))
+                    except (IOError, UnicodeDecodeError):
+                        pass
+        return files
+
+    def catenate(self, file_overrides=None):
+        """
+        Concatenate all files into a single output string.
+
+        Args:
+            file_overrides: Optional dict mapping relative_path -> content or
+                           (content, label) tuple. If content is None, file is
+                           skipped. Label defaults to "summary" if not specified.
+        """
         result = []
+        file_overrides = file_overrides or {}
 
         result.append(f"### {self.title}\n\n")
 
@@ -217,12 +267,22 @@ class Catenator:
                 ):
                     relative_path = os.path.relpath(file_path, self.directory)
 
-                    result.append(f"# {relative_path}\n")
+                    if relative_path in file_overrides:
+                        override = file_overrides[relative_path]
+                        if isinstance(override, tuple):
+                            content, label = override
+                        else:
+                            content, label = override, "summary"
+                        if content is None:
+                            continue
+                        result.append(f"# {relative_path} ({label})\n")
+                        result.append(content)
+                    else:
+                        result.append(f"# {relative_path}\n")
+                        with open(file_path, "r", encoding="utf-8") as f:
+                            result.append(f.read())
 
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        result.append(f.read())
-
-                    result.append("\n\n")  # Add some space between files
+                    result.append("\n\n")
 
         return "".join(result)
 
@@ -361,6 +421,16 @@ def main():
         type=str,
         help="Name of the build to use from .catconfig.yaml",
     )
+    parser.add_argument(
+        "--token-limit",
+        type=int,
+        help="Max tokens; summarize least important files to fit",
+    )
+    parser.add_argument(
+        "--llm",
+        action="store_true",
+        help="Use AI to generate rich summaries (requires robot module)",
+    )
 
     args = parser.parse_args()
 
@@ -388,7 +458,96 @@ def main():
             print(f"Warning: Config file {config_path} not found.")
 
     catenator = Catenator.from_cli_args(args, build_config=build_config)
-    catenated_content = catenator.catenate()
+
+    # Handle token limit with progressive content reduction:
+    # 1. Full content for most important files
+    # 2. Summaries until 90% of budget
+    # 3. Docstrings until 100% of budget
+    # 4. Truncate if still over
+    file_overrides = {}
+    if args.token_limit:
+        from . import summarizer
+
+        files = catenator.collect_files()
+        if files:
+            ranked = summarizer.rank_files_by_importance(
+                catenator.directory, files
+            )
+
+            # Start by skipping all files, then add progressively
+            for rel_path, _, _, _ in ranked:
+                file_overrides[rel_path] = (None, "skipped")
+
+            budget_90 = int(args.token_limit * 0.9)
+            full_count = 0
+            summary_count = 0
+            docstring_count = 0
+
+            # Phase 1: Add full content for most important files
+            for rel_path, file_path, content, score in ranked:
+                del file_overrides[rel_path]  # Try adding full content
+                test_tokens = catenator.count_tokens(catenator.catenate(file_overrides))
+                if test_tokens > budget_90:
+                    # Can't fit full content, restore skip
+                    file_overrides[rel_path] = (None, "skipped")
+                    break
+                full_count += 1
+
+            # Phase 2: Add summaries until 90% budget
+            for rel_path, file_path, content, score in ranked:
+                if rel_path not in file_overrides:
+                    continue  # Already included as full
+                summary = summarizer.summarize_file(
+                    catenator.directory, rel_path, file_path, content,
+                    use_llm=args.llm
+                )
+                file_overrides[rel_path] = (summary, "summary")
+                test_tokens = catenator.count_tokens(catenator.catenate(file_overrides))
+                if test_tokens > budget_90:
+                    # Can't fit summary, revert to skip
+                    file_overrides[rel_path] = (None, "skipped")
+                    break
+                summary_count += 1
+
+            # Phase 3: Add docstrings until 100% budget
+            for rel_path, file_path, content, score in ranked:
+                override = file_overrides.get(rel_path)
+                if override is None or override[0] is not None:
+                    continue  # Already included or has summary
+                docstring = summarizer.extract_docstring(content)
+                if not docstring:
+                    continue
+                file_overrides[rel_path] = (docstring, "docstring")
+                test_tokens = catenator.count_tokens(catenator.catenate(file_overrides))
+                if test_tokens > args.token_limit:
+                    # Can't fit docstring, revert to skip
+                    file_overrides[rel_path] = (None, "skipped")
+                    break
+                docstring_count += 1
+
+            # Clean up skipped files from overrides
+            file_overrides = {
+                k: v for k, v in file_overrides.items() if v[0] is not None
+            }
+
+            print(
+                f"Token budget: {full_count} full, {summary_count} summarized, "
+                f"{docstring_count} docstring-only"
+            )
+
+    catenated_content = catenator.catenate(file_overrides)
+
+    # Phase 4: Truncate if still over limit
+    if args.token_limit:
+        token_count = catenator.count_tokens(catenated_content)
+        if token_count > args.token_limit:
+            import tiktoken
+            encoding = tiktoken.get_encoding(catenator.TOKENIZER)
+            tokens = encoding.encode(catenated_content)
+            truncated_tokens = tokens[:args.token_limit]
+            catenated_content = encoding.decode(truncated_tokens)
+            catenated_content += "\n\n[truncated]"
+            print(f"Output truncated from {token_count} to {args.token_limit} tokens")
 
     if args.output:
         output_path = os.path.abspath(args.output)
