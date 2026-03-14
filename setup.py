@@ -35,6 +35,7 @@ setup(
     url="https://github.com/philiporange/catenator",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
+    package_data={"catenator": ["default.catignore"]},
     install_requires=[
         "pyperclip",
         "watchdog",
