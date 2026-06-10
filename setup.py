@@ -43,7 +43,7 @@ setup(
     ],
     extras_require={
         "token_counting": ["tiktoken"],
-        "summarize": ["tiktoken", "robot"],
+        "summarize": ["tiktoken", "openai"],
     },
     entry_points={
         "console_scripts": [
