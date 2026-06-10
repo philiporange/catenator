@@ -223,6 +223,66 @@ class TestCatenator(unittest.TestCase):
         # ignored_file.txt is not in the whitelist
         self.assertNotIn("ignored_file.txt", result)
 
+    def test_always_ignore_nested_vendored_dirs(self):
+        nested = os.path.join(self.temp_dir, "frontend", "node_modules", "pkg")
+        os.makedirs(nested)
+        with open(os.path.join(nested, "index.js"), "w") as f:
+            f.write("console.log('vendored');")
+        venv_dir = os.path.join(self.temp_dir, "backend", "venv", "lib")
+        os.makedirs(venv_dir)
+        with open(os.path.join(venv_dir, "site.py"), "w") as f:
+            f.write("print('venv internals')")
+
+        catenator = Catenator(self.temp_dir)
+        result = catenator.catenate()
+
+        self.assertNotIn("node_modules", result)
+        self.assertNotIn("vendored", result)
+        self.assertNotIn("venv", result)
+        self.assertNotIn("venv internals", result)
+
+    def test_always_ignore_applies_in_build_mode(self):
+        nested = os.path.join(self.temp_dir, "subdir", "node_modules")
+        os.makedirs(nested)
+        with open(os.path.join(nested, "dep.js"), "w") as f:
+            f.write("console.log('dep');")
+
+        build_config = {"whitelist": ["subdir/"]}
+        catenator = Catenator(self.temp_dir, build_config=build_config)
+        result = catenator.catenate()
+
+        self.assertIn("# subdir/file3.py", result)
+        self.assertNotIn("node_modules", result)
+        self.assertNotIn("console.log('dep');", result)
+
+    def test_cat_ignore_dir_pattern_matches_nested(self):
+        with open(os.path.join(self.temp_dir, ".catignore"), "w") as f:
+            f.write("ignored_dir/\n")
+        nested = os.path.join(self.temp_dir, "subdir", "ignored_dir")
+        os.makedirs(nested)
+        with open(os.path.join(nested, "file5.py"), "w") as f:
+            f.write("print('nested ignored')")
+
+        catenator = Catenator(self.temp_dir)
+        result = catenator.catenate()
+
+        self.assertIn("# subdir/file3.py", result)
+        self.assertNotIn("ignored_dir", result)
+        self.assertNotIn("nested ignored", result)
+
+    def test_cat_ignore_filename_pattern_matches_nested(self):
+        with open(os.path.join(self.temp_dir, ".catignore"), "w") as f:
+            f.write("package-lock.json\n")
+        with open(
+            os.path.join(self.temp_dir, "subdir", "package-lock.json"), "w"
+        ) as f:
+            f.write("{}")
+
+        catenator = Catenator(self.temp_dir)
+        result = catenator.catenate()
+
+        self.assertNotIn("package-lock.json", result)
+
 
 if __name__ == "__main__":
     unittest.main()

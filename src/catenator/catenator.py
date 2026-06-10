@@ -4,8 +4,14 @@ Catenator concatenates source code files from a project into a single output.
 When --token-limit is specified, uses a progressive approach to fit within the
 budget: full content for most important files, then summaries until 90% budget,
 then docstrings until 100%, then truncates if needed. Summaries use signature
-extraction by default; --llm flag enables AI summaries (via robot module).
+extraction by default; --llm flag enables AI summaries via the openai module.
 Summaries are cached in ~/.catenator/summaries/ for reuse.
+
+Ignore handling: vendored/generated directories (node_modules, __pycache__,
+venv, .git, etc.) are always excluded, in every mode, at any depth. .catignore
+patterns use gitignore-style semantics: patterns without a slash match path
+components at any depth, and directory patterns (trailing slash) match the
+directory and everything inside it.
 """
 
 import os
@@ -51,6 +57,19 @@ class Catenator:
     TOKENIZER = "cl100k_base"
     CATIGNORE_FILENAME = ".catignore"
     CATCONFIG_FILENAME = ".catconfig.yaml"
+    # Excluded in every mode (including --build and --include-hidden), at any
+    # depth, regardless of .catignore contents
+    ALWAYS_IGNORE_DIRS = {
+        "__pycache__",
+        "node_modules",
+        ".git",
+        "venv",
+        ".venv",
+        ".tox",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+    }
 
     def __init__(
         self,
@@ -101,12 +120,40 @@ class Catenator:
             if line.strip() and not line.startswith("#")
         ]
 
+    @staticmethod
+    def matches_pattern(rel_path, pattern):
+        """
+        Gitignore-style pattern matching.
+
+        Directory patterns (trailing slash) match that directory and
+        everything inside it, at any depth unless the pattern contains an
+        inner slash (then it is anchored to the project root). Patterns
+        without a slash match any path component at any depth. Patterns
+        containing a slash match against the full relative path.
+        """
+        parts = rel_path.split(os.sep)
+        if pattern.endswith("/"):
+            dir_pattern = pattern.rstrip("/")
+            if "/" in dir_pattern:
+                return rel_path.startswith(pattern) or fnmatch.fnmatch(
+                    rel_path + "/", pattern
+                )
+            return any(fnmatch.fnmatch(part, dir_pattern) for part in parts)
+        if "/" in pattern:
+            return fnmatch.fnmatch(rel_path, pattern)
+        return any(fnmatch.fnmatch(part, pattern) for part in parts)
+
     def should_ignore(self, path):
         rel_path = os.path.relpath(path, self.directory)
 
         # Never ignore the top-level directory itself
         if rel_path == ".":
             return False
+
+        # Vendored/generated directories are never included, in any mode
+        parts = rel_path.split(os.sep)
+        if any(part in self.ALWAYS_IGNORE_DIRS for part in parts):
+            return True
 
         if self.build_config:
             whitelist = self.build_config.get("whitelist", [])
@@ -140,12 +187,9 @@ class Catenator:
 
             return False
 
-        # Ignore __pycache__ and hidden files/directories
+        # Ignore hidden files/directories
         if not self.include_hidden:
-            parts = rel_path.split(os.sep)
-            if any(
-                part.startswith(".") or part == "__pycache__" for part in parts
-            ):
+            if any(part.startswith(".") for part in parts):
                 return True
 
         # Check if we should ignore test files/directories
@@ -157,12 +201,7 @@ class Catenator:
 
         # Apply patterns from .catignore
         for pattern in self.ignore_patterns:
-            if pattern.endswith("/"):
-                if fnmatch.fnmatch(
-                    rel_path + "/", pattern
-                ) or rel_path.startswith(pattern):
-                    return True
-            elif fnmatch.fnmatch(rel_path, pattern):
+            if self.matches_pattern(rel_path, pattern):
                 return True
 
         return False
@@ -227,7 +266,8 @@ class Catenator:
         Args:
             file_overrides: Optional dict mapping relative_path -> content or
                            (content, label) tuple. If content is None, file is
-                           skipped. Label defaults to "summary" if not specified.
+                           skipped. Label defaults to "summary" if not
+                           specified.
         """
         result = []
         file_overrides = file_overrides or {}
@@ -278,9 +318,13 @@ class Catenator:
                         result.append(f"# {relative_path} ({label})\n")
                         result.append(content)
                     else:
+                        try:
+                            with open(file_path, "r", encoding="utf-8") as f:
+                                content = f.read()
+                        except (IOError, UnicodeDecodeError):
+                            continue
                         result.append(f"# {relative_path}\n")
-                        with open(file_path, "r", encoding="utf-8") as f:
-                            result.append(f.read())
+                        result.append(content)
 
                     result.append("\n\n")
 
@@ -429,14 +473,16 @@ def main():
     parser.add_argument(
         "--llm",
         action="store_true",
-        help="Use AI to generate rich summaries (requires robot module)",
+        help="Use AI to generate rich summaries (requires openai module)",
     )
 
     args = parser.parse_args()
 
     build_config = {}
     if args.build:
-        config_path = os.path.join(args.directory, Catenator.CATCONFIG_FILENAME)
+        config_path = os.path.join(
+            args.directory, Catenator.CATCONFIG_FILENAME
+        )
         if os.path.isfile(config_path):
             with open(config_path, "r", encoding="utf-8") as f:
                 try:
@@ -450,7 +496,8 @@ def main():
                         print(f"Using build '{args.build}' from {config_path}")
                     else:
                         print(
-                            f"Warning: Build '{args.build}' not found in {config_path}"
+                            f"Warning: Build '{args.build}' "
+                            f"not found in {config_path}"
                         )
                 except yaml.YAMLError as e:
                     print(f"Error parsing {config_path}: {e}")
@@ -486,7 +533,9 @@ def main():
             # Phase 1: Add full content for most important files
             for rel_path, file_path, content, score in ranked:
                 del file_overrides[rel_path]  # Try adding full content
-                test_tokens = catenator.count_tokens(catenator.catenate(file_overrides))
+                test_tokens = catenator.count_tokens(
+                    catenator.catenate(file_overrides)
+                )
                 if test_tokens > budget_90:
                     # Can't fit full content, restore skip
                     file_overrides[rel_path] = (None, "skipped")
@@ -498,11 +547,16 @@ def main():
                 if rel_path not in file_overrides:
                     continue  # Already included as full
                 summary = summarizer.summarize_file(
-                    catenator.directory, rel_path, file_path, content,
-                    use_llm=args.llm
+                    catenator.directory,
+                    rel_path,
+                    file_path,
+                    content,
+                    use_llm=args.llm,
                 )
                 file_overrides[rel_path] = (summary, "summary")
-                test_tokens = catenator.count_tokens(catenator.catenate(file_overrides))
+                test_tokens = catenator.count_tokens(
+                    catenator.catenate(file_overrides)
+                )
                 if test_tokens > budget_90:
                     # Can't fit summary, revert to skip
                     file_overrides[rel_path] = (None, "skipped")
@@ -518,7 +572,9 @@ def main():
                 if not docstring:
                     continue
                 file_overrides[rel_path] = (docstring, "docstring")
-                test_tokens = catenator.count_tokens(catenator.catenate(file_overrides))
+                test_tokens = catenator.count_tokens(
+                    catenator.catenate(file_overrides)
+                )
                 if test_tokens > args.token_limit:
                     # Can't fit docstring, revert to skip
                     file_overrides[rel_path] = (None, "skipped")
@@ -531,7 +587,8 @@ def main():
             }
 
             print(
-                f"Token budget: {full_count} full, {summary_count} summarized, "
+                f"Token budget: {full_count} full, "
+                f"{summary_count} summarized, "
                 f"{docstring_count} docstring-only"
             )
 
@@ -542,12 +599,16 @@ def main():
         token_count = catenator.count_tokens(catenated_content)
         if token_count > args.token_limit:
             import tiktoken
+
             encoding = tiktoken.get_encoding(catenator.TOKENIZER)
             tokens = encoding.encode(catenated_content)
-            truncated_tokens = tokens[:args.token_limit]
+            truncated_tokens = tokens[: args.token_limit]
             catenated_content = encoding.decode(truncated_tokens)
             catenated_content += "\n\n[truncated]"
-            print(f"Output truncated from {token_count} to {args.token_limit} tokens")
+            print(
+                f"Output truncated from {token_count} "
+                f"to {args.token_limit} tokens"
+            )
 
     if args.output:
         output_path = os.path.abspath(args.output)

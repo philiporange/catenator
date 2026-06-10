@@ -38,7 +38,7 @@ Options:
 - `--watch`: Watch for changes and update output file automatically (requires --output)
 - `--ignore-tests`: Leave out tests from the concatenated output
 - `--token-limit N`: Keep output under N tokens by summarizing least important files
-- `--llm`: Use AI for richer summaries when using --token-limit (requires robot module)
+- `--llm`: Use AI for richer summaries when using --token-limit (requires openai module)
 
 Example:
 ```
@@ -69,6 +69,9 @@ The .catignore file allows you to specify files and directories that should be e
 Lines starting with # are treated as comments.
 Blank lines are ignored.
 Patterns can include filenames, directories, or wildcard characters.
+Patterns without a slash match at any depth, so `node_modules/` excludes
+`frontend/node_modules/` too. Patterns containing a slash are anchored to
+the project root.
 
 ### Examples
 
@@ -79,9 +82,16 @@ Patterns can include filenames, directories, or wildcard characters.
 # Ignore specific file
 ignored_file.txt
 
-# Ignore entire directory
+# Ignore entire directory (at any depth)
 ignored_dir/
 ```
+
+### Always-ignored directories
+
+Vendored and generated directories (`node_modules`, `__pycache__`, `venv`,
+`.venv`, `.git`, and common tool caches) are always excluded at any depth —
+in every mode, including `--build` and `--include-hidden` — so they can
+never swamp the output.
 
 ## .catconfig.yaml for Custom Builds
 
@@ -140,7 +150,7 @@ By default, summaries are structural extracts (function/class signatures and doc
 catenator /path/to/project --token-limit 10000 --llm
 ```
 
-Files are labeled in the output: `(summary)` for summarized files, `(docstring)` for docstring-only files. Summaries are cached in `~/.catenator/summaries/`. Token counting requires tiktoken; AI summaries require the `robot` module.
+Files are labeled in the output: `(summary)` for summarized files, `(docstring)` for docstring-only files. Summaries are cached in `~/.catenator/summaries/`. Token counting requires tiktoken; AI summaries require the `openai` module.
 
 ## License
 
