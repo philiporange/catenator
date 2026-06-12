@@ -8,10 +8,14 @@ extraction by default; --llm flag enables AI summaries via the openai module.
 Summaries are cached in ~/.catenator/summaries/ for reuse.
 
 Ignore handling: vendored/generated directories (node_modules, __pycache__,
-venv, .git, etc.) are always excluded, in every mode, at any depth. .catignore
-patterns use gitignore-style semantics: patterns without a slash match path
-components at any depth, and directory patterns (trailing slash) match the
-directory and everything inside it.
+venv, .git, etc.) are always excluded, in every mode, at any depth. The
+bundled default.catignore always applies; a project's .catignore adds
+patterns on top of it rather than replacing it. .catignore patterns use
+gitignore-style semantics: patterns without a slash match path components at
+any depth, and directory patterns (trailing slash) match the directory and
+everything inside it. Files containing any line longer than MAX_LINE_LENGTH
+are treated as minified/generated and skipped (markdown exempt) unless
+--include-minified is given.
 """
 
 import os
@@ -70,6 +74,10 @@ class Catenator:
         ".pytest_cache",
         ".ruff_cache",
     }
+    # Any line longer than this marks a file as minified/generated
+    MAX_LINE_LENGTH = 2000
+    # Prose formats legitimately contain unwrapped long lines
+    MINIFIED_CHECK_EXEMPT_EXTENSIONS = {"md", "txt", "rst"}
 
     def __init__(
         self,
@@ -82,6 +90,7 @@ class Catenator:
         ignore_tests=False,
         include_hidden=False,
         build_config=None,
+        include_minified=False,
     ):
         self.directory = directory
         self.include_extensions = (
@@ -95,30 +104,32 @@ class Catenator:
         self.ignore_tests = ignore_tests
         self.include_hidden = include_hidden
         self.build_config = build_config or {}
+        self.include_minified = include_minified
 
     def load_cat_ignore(self):
-        ignore_file = os.path.join(self.directory, self.CATIGNORE_FILENAME)
-        if os.path.isfile(ignore_file):
-            # If a local .catignore exists, use it
-            with open(ignore_file, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-        else:
-            # Fallback to default.catignore if it exists
-            default_ignore_path = os.path.join(
-                os.path.dirname(__file__), "default.catignore"
-            )
-            if os.path.isfile(default_ignore_path):
-                with open(default_ignore_path, "r", encoding="utf-8") as f:
-                    lines = f.readlines()
-            else:
-                # No local .catignore and no default.catignore found
-                return []
+        """
+        Load ignore patterns from the bundled default.catignore, then add
+        patterns from the project's .catignore. The defaults always apply;
+        a local .catignore extends them rather than replacing them.
+        """
+        default_ignore_path = os.path.join(
+            os.path.dirname(__file__), "default.catignore"
+        )
+        local_ignore_path = os.path.join(
+            self.directory, self.CATIGNORE_FILENAME
+        )
 
-        return [
-            line.strip()
-            for line in lines
-            if line.strip() and not line.startswith("#")
-        ]
+        patterns = []
+        for path in (default_ignore_path, local_ignore_path):
+            if not os.path.isfile(path):
+                continue
+            with open(path, "r", encoding="utf-8") as f:
+                patterns.extend(
+                    line.strip()
+                    for line in f
+                    if line.strip() and not line.startswith("#")
+                )
+        return patterns
 
     @staticmethod
     def matches_pattern(rel_path, pattern):
@@ -142,6 +153,22 @@ class Catenator:
         if "/" in pattern:
             return fnmatch.fnmatch(rel_path, pattern)
         return any(fnmatch.fnmatch(part, pattern) for part in parts)
+
+    def is_minified(self, filename, content):
+        """
+        Detect minified or generated content by line length. Real source
+        code essentially never has lines longer than MAX_LINE_LENGTH;
+        minified bundles, embedded data blobs, and scraped pages do.
+        Prose formats are exempt since they may be unwrapped.
+        """
+        if self.include_minified:
+            return False
+        extension = os.path.splitext(filename)[1][1:].lower()
+        if extension in self.MINIFIED_CHECK_EXEMPT_EXTENSIONS:
+            return False
+        return any(
+            len(line) > self.MAX_LINE_LENGTH for line in content.splitlines()
+        )
 
     def should_ignore(self, path):
         rel_path = os.path.relpath(path, self.directory)
@@ -254,9 +281,11 @@ class Catenator:
                     try:
                         with open(file_path, "r", encoding="utf-8") as f:
                             content = f.read()
-                        files.append((relative_path, file_path, content))
                     except (IOError, UnicodeDecodeError):
-                        pass
+                        continue
+                    if self.is_minified(filename, content):
+                        continue
+                    files.append((relative_path, file_path, content))
         return files
 
     def catenate(self, file_overrides=None):
@@ -323,6 +352,8 @@ class Catenator:
                                 content = f.read()
                         except (IOError, UnicodeDecodeError):
                             continue
+                        if self.is_minified(file, content):
+                            continue
                         result.append(f"# {relative_path}\n")
                         result.append(content)
 
@@ -360,6 +391,7 @@ class Catenator:
             ignore_tests=args.ignore_tests,
             include_hidden=args.include_hidden,
             build_config=build_config,
+            include_minified=args.include_minified,
         )
 
 
@@ -459,6 +491,11 @@ def main():
         "--include-hidden",
         action="store_true",
         help="Include hidden files (starting with '.') in the output",
+    )
+    parser.add_argument(
+        "--include-minified",
+        action="store_true",
+        help="Include minified/generated files (very long lines) in output",
     )
     parser.add_argument(
         "--build",

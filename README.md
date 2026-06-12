@@ -37,6 +37,7 @@ Options:
 - `--count-tokens`: Output approximation of how many tokens in output (tiktoken cl100k_base)
 - `--watch`: Watch for changes and update output file automatically (requires --output)
 - `--ignore-tests`: Leave out tests from the concatenated output
+- `--include-minified`: Include minified/generated files (skipped by default)
 - `--token-limit N`: Keep output under N tokens by summarizing least important files
 - `--llm`: Use AI for richer summaries when using --token-limit (requires openai module)
 
@@ -63,6 +64,11 @@ print(result)
 ## .catignore File
 
 The .catignore file allows you to specify files and directories that should be excluded from the concatenation process. The syntax is like .gitignore files.
+
+Catenator ships with a comprehensive `default.catignore` covering build
+artifacts, vendored libraries, lockfiles, coverage reports, generated docs,
+media files, and ML artifacts. The defaults always apply; a project's
+`.catignore` adds patterns on top of them rather than replacing them.
 
 ### Syntax
 
@@ -92,6 +98,14 @@ Vendored and generated directories (`node_modules`, `__pycache__`, `venv`,
 `.venv`, `.git`, and common tool caches) are always excluded at any depth —
 in every mode, including `--build` and `--include-hidden` — so they can
 never swamp the output.
+
+### Minified and generated files
+
+Files containing any line longer than 2000 characters are treated as
+minified or generated (webpack bundles, vendored frameworks, embedded data
+blobs, scraped pages) and skipped. Prose formats (`md`, `txt`, `rst`) are
+exempt since they may contain unwrapped paragraphs. Use `--include-minified`
+to disable this check.
 
 ## .catconfig.yaml for Custom Builds
 

@@ -283,6 +283,46 @@ class TestCatenator(unittest.TestCase):
 
         self.assertNotIn("package-lock.json", result)
 
+    def test_local_cat_ignore_extends_defaults(self):
+        # cat.md is in default.catignore; a local .catignore must add to
+        # the defaults, not replace them
+        with open(os.path.join(self.temp_dir, ".catignore"), "w") as f:
+            f.write("ignored_file.txt\n")
+        with open(os.path.join(self.temp_dir, "cat.md"), "w") as f:
+            f.write("previous catenator output")
+
+        catenator = Catenator(self.temp_dir)
+        result = catenator.catenate()
+
+        self.assertNotIn("cat.md", result)
+        self.assertNotIn("ignored_file.txt", result)
+        self.assertIn("# file1.py", result)
+
+    def test_minified_files_skipped(self):
+        long_line = "var x=1;" * 1000
+        with open(os.path.join(self.temp_dir, "bundle.js"), "w") as f:
+            f.write(long_line)
+        with open(os.path.join(self.temp_dir, "notes.md"), "w") as f:
+            f.write(long_line)
+
+        catenator = Catenator(self.temp_dir)
+        result = catenator.catenate()
+        self.assertNotIn("# bundle.js", result)
+        self.assertIn("# notes.md", result)
+
+        catenator = Catenator(self.temp_dir, include_minified=True)
+        result = catenator.catenate()
+        self.assertIn("# bundle.js", result)
+
+    def test_minified_files_skipped_in_collect_files(self):
+        with open(os.path.join(self.temp_dir, "bundle.js"), "w") as f:
+            f.write("var x=1;" * 1000)
+
+        catenator = Catenator(self.temp_dir)
+        rel_paths = [rel for rel, _, _ in catenator.collect_files()]
+        self.assertNotIn("bundle.js", rel_paths)
+        self.assertIn("file1.py", rel_paths)
+
 
 if __name__ == "__main__":
     unittest.main()

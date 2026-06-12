@@ -30,9 +30,20 @@ htmlcov/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
+.ipynb_checkpoints/
+site-packages/
+coverage.xml
+.nyc_output/
+lcov.info
 Pipfile.lock
 poetry.lock
 uv.lock
+
+# -------------------------------------------------------------------
+# Generated docs (Sphinx, Jekyll)
+_build/
+_static/
+_site/
 
 # -------------------------------------------------------------------
 # Node & Web
@@ -44,16 +55,37 @@ yarn-error.log
 package-lock.json
 yarn.lock
 pnpm-lock.yaml
+bun.lock
+bun.lockb
 .next/
 .nuxt/
 .output/
 .cache/
 .parcel-cache/
+.svelte-kit/
+.astro/
+.turbo/
+.vite/
+.docusaurus/
+storybook-static/
+built/
+generated/
+__snapshots__/
+*.snap
 *.min.js
 *.min.css
 *.bundle.js
 *.chunk.js
+chunk.*.js
+*.umd.js
 *.map
+
+# Vendored frontend libraries
+jquery*.js
+bootstrap*.js
+bootstrap*.css
+tailwind*.js
+tailwindcss*.js
 
 # -------------------------------------------------------------------
 # Java / Kotlin / JVM
@@ -195,15 +227,30 @@ desktop.ini
 # -------------------------------------------------------------------
 # Infrastructure / DevOps
 .terraform/
+.terraform.lock.hcl
 *.tfstate
 *.tfstate.backup
 .serverless/
 
 # -------------------------------------------------------------------
+# ML / Data artifacts
+wandb/
+checkpoints/
+*.pth
+*.pt
+*.ckpt
+*.safetensors
+*.onnx
+*.h5
+*.npy
+*.npz
+*.parquet
+*.pickle
+*.pkl
+*.bin
+
+# -------------------------------------------------------------------
 # Misc
 .env
 .env.*
-wandb/
-*.pth
-*.pickle
-*.pkl
+third_party/
