@@ -115,6 +115,15 @@ class TestCatenator(unittest.TestCase):
         self.assertIsInstance(token_count, int)
         self.assertGreater(token_count, 0)
 
+    @unittest.skipIf(skip_tiktoken, "tiktoken not installed")
+    def test_count_tokens_with_special_tokens(self):
+        # tiktoken raises on special tokens by default; they must be
+        # treated as ordinary text instead
+        catenator = Catenator(self.temp_dir)
+        for marker in ("<|endoftext|>", "<|fim_prefix|>", "<|endofprompt|>"):
+            token_count = catenator.count_tokens(f"before {marker} after")
+            self.assertGreater(token_count, 0)
+
     def test_cat_ignore_file(self):
         # Create a .cat_ignore file
         with open(os.path.join(self.temp_dir, ".catignore"), "w") as f:

@@ -370,7 +370,9 @@ class Catenator:
             )
 
         encoding = tiktoken.get_encoding(self.TOKENIZER)
-        tokens = encoding.encode(s)
+        # Treat special tokens (e.g. <|endoftext|>) as ordinary text rather
+        # than letting tiktoken raise on them.
+        tokens = encoding.encode(s, disallowed_special=())
         return len(tokens)
 
     @classmethod
@@ -638,7 +640,9 @@ def main():
             import tiktoken
 
             encoding = tiktoken.get_encoding(catenator.TOKENIZER)
-            tokens = encoding.encode(catenated_content)
+            tokens = encoding.encode(
+                catenated_content, disallowed_special=()
+            )
             truncated_tokens = tokens[: args.token_limit]
             catenated_content = encoding.decode(truncated_tokens)
             catenated_content += "\n\n[truncated]"
