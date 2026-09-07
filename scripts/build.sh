@@ -38,7 +38,7 @@ echo "Linting passed"
 
 # Run tests
 echo "Running tests"
-python3 -m unittest discover -s $TESTS_DIR
+python3 -m pytest "$TESTS_DIR"
 if [ $? -ne 0 ]; then
     echo "Tests failed"
     exit 1

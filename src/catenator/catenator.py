@@ -1,16 +1,18 @@
 """
 Catenator concatenates source code files from a project into a single output.
 
-When --token-limit is specified, uses a progressive approach to fit within the
-budget: full content for most important files, then summaries until 90% budget,
-then docstrings until 100%, then truncates if needed. Summaries use signature
-extraction by default; --llm flag enables AI summaries via the openai module.
-Summaries are cached in ~/.catenator/summaries/ for reuse.
+Each output starts with a deterministic project overview derived from source
+and manifests. Files are discovered once, in stable order, and ignored trees
+are pruned before descent. Budgeted output covers the main directories with
+outlines before expanding important files into structural summaries or full
+source. Whole sections, including the overview and tree, share a strict token
+budget. The optional --llm flag still enables AI file summaries.
 
 Ignore handling: vendored/generated directories (node_modules, __pycache__,
 venv, .git, etc.) are always excluded, in every mode, at any depth. The
-bundled default.catignore always applies; a project's .catignore adds
-patterns on top of it rather than replacing it. .catignore patterns use
+bundled default.catignore applies in normal mode; a project's .catignore adds
+patterns on top of it. Builds supply their own whitelist and blacklist.
+.catignore patterns use
 gitignore-style semantics: patterns without a slash match path components at
 any depth, and directory patterns (trailing slash) match the directory and
 everything inside it. Files containing any line longer than MAX_LINE_LENGTH
@@ -21,6 +23,8 @@ are treated as minified/generated and skipped (markdown exempt) unless
 import os
 import argparse
 import fnmatch
+import re
+import sys
 import time
 from threading import Timer
 import yaml
@@ -56,8 +60,38 @@ class Catenator:
         "rs",
         "dart",
         "md",
+        "rst",
+        "jsx",
+        "tsx",
+        "mjs",
+        "cjs",
+        "mts",
+        "cts",
+        "vue",
+        "svelte",
+        "astro",
+        "json",
+        "yaml",
+        "yml",
+        "toml",
+        "ini",
+        "cfg",
     ]
-    README_FILES = ["README", "README.md", "README.txt"]
+    README_FILES = ["README", "README.md", "README.txt", "README.rst"]
+    PROJECT_FILES = {
+        "makefile",
+        "gnumakefile",
+        "dockerfile",
+        "containerfile",
+        "cmakelists.txt",
+        "go.mod",
+        "gemfile",
+        "rakefile",
+        "procfile",
+        "justfile",
+        "pipfile",
+        "default.catignore",
+    }
     TOKENIZER = "cl100k_base"
     CATIGNORE_FILENAME = ".catignore"
     CATCONFIG_FILENAME = ".catconfig.yaml"
@@ -91,11 +125,14 @@ class Catenator:
         include_hidden=False,
         build_config=None,
         include_minified=False,
+        include_overview=True,
+        exclude_paths=None,
     ):
         self.directory = directory
         self.include_extensions = (
             include_extensions or self.DEFAULT_CODE_EXTENSIONS
         )
+        self.custom_extensions = include_extensions is not None
         self.ignore_extensions = ignore_extensions or []
         self.include_tree = include_tree
         self.include_readme = include_readme
@@ -105,6 +142,11 @@ class Catenator:
         self.include_hidden = include_hidden
         self.build_config = build_config or {}
         self.include_minified = include_minified
+        self.include_overview = include_overview
+        self.exclude_paths = {
+            os.path.abspath(path) for path in (exclude_paths or [])
+        }
+        self.last_report = {}
 
     def load_cat_ignore(self):
         """
@@ -170,12 +212,24 @@ class Catenator:
             len(line) > self.MAX_LINE_LENGTH for line in content.splitlines()
         )
 
+    @staticmethod
+    def may_contain_match(directory, pattern):
+        """Keep only ancestors compatible with a whitelist's literal prefix."""
+        prefix = re.split(r"[*?\[]", pattern, maxsplit=1)[0]
+        directory = directory.replace(os.sep, "/") + "/"
+        return prefix.startswith(directory) or (
+            len(prefix) < len(pattern) and directory.startswith(prefix)
+        )
+
     def should_ignore(self, path):
         rel_path = os.path.relpath(path, self.directory)
 
         # Never ignore the top-level directory itself
         if rel_path == ".":
             return False
+
+        if os.path.abspath(path) in self.exclude_paths:
+            return True
 
         # Vendored/generated directories are never included, in any mode
         parts = rel_path.split(os.sep)
@@ -210,20 +264,32 @@ class Catenator:
                         is_whitelisted = True
                         break
                 if not is_whitelisted:
-                    return True
+                    # Whitelisted descendants must remain reachable.
+                    if not os.path.isdir(path):
+                        return True
+                    if not any(
+                        self.may_contain_match(rel_path, pattern)
+                        for pattern in whitelist
+                    ):
+                        return True
 
             return False
 
         # Ignore hidden files/directories
         if not self.include_hidden:
-            if any(part.startswith(".") for part in parts):
+            ci_path = rel_path.replace(os.sep, "/")
+            known_ci = (
+                ci_path in (".github", ".github/workflows", ".gitlab-ci.yml")
+                or ci_path.startswith(".github/workflows/")
+            ) and not any(part.startswith(".") for part in parts[1:])
+            if any(part.startswith(".") for part in parts) and not known_ci:
                 return True
 
         # Check if we should ignore test files/directories
         if self.ignore_tests:
-            if rel_path.startswith("tests/") or os.path.basename(
-                rel_path
-            ).startswith("test_"):
+            from .summarizer import is_test_file
+
+            if is_test_file(rel_path):
                 return True
 
         # Apply patterns from .catignore
@@ -233,133 +299,106 @@ class Catenator:
 
         return False
 
-    def generate_directory_tree(self):
-        tree = []
+    @classmethod
+    def is_readme(cls, filename):
+        return filename.lower() in {name.lower() for name in cls.README_FILES}
+
+    def walk_project(self):
+        """Walk eligible directories once, pruning excluded subtrees."""
         for root, dirs, files in os.walk(self.directory):
-            dirs[:] = [
+            dirs[:] = sorted(
                 d
                 for d in dirs
                 if not self.should_ignore(os.path.join(root, d))
-            ]
-            level = root.replace(self.directory, "").count(os.sep)
-            indent = "│   " * (level - 1) + "├── " if level > 0 else ""
-            if not self.should_ignore(root):
-                tree.append(f"{indent}{os.path.basename(root)}/")
-                for file in files:
-                    if not self.should_ignore(os.path.join(root, file)):
-                        # Skip README files if include_readme is False
-                        if (
-                            self.include_readme
-                            or file not in self.README_FILES
-                        ):
-                            tree.append(f"{indent}│   {file}")
+            )
+            yield root, dirs, sorted(files)
+
+    def select_file(self, filename):
+        """Select source and project metadata, respecting explicit filters."""
+        if self.is_readme(filename):
+            return self.include_readme
+        extension = os.path.splitext(filename)[1][1:].lower()
+        if extension in {ext.lower() for ext in self.ignore_extensions}:
+            return False
+        if self.build_config:
+            return True
+        if extension in {ext.lower() for ext in self.include_extensions}:
+            return True
+        return not self.custom_extensions and (
+            filename.lower() in self.PROJECT_FILES
+            or fnmatch.fnmatch(filename.lower(), "requirements*.txt")
+            or fnmatch.fnmatch(filename.lower(), "requirements*.in")
+            or filename.lower().startswith("dockerfile.")
+        )
+
+    def generate_directory_tree(self, paths=None):
+        """Render a stable tree; reuse a discovery snapshot when supplied."""
+        if paths is None:
+            paths = []
+            for root, dirs, files in self.walk_project():
+                for name in dirs + files:
+                    path = os.path.join(root, name)
+                    if self.should_ignore(path):
+                        continue
+                    if self.is_readme(name) and not self.include_readme:
+                        continue
+                    relative = os.path.relpath(path, self.directory)
+                    paths.append(relative + ("/" if name in dirs else ""))
+        tree = [os.path.basename(os.path.abspath(self.directory)) + "/"]
+        for relative in sorted(paths):
+            parts = relative.rstrip("/").replace(os.sep, "/").split("/")
+            suffix = "/" if relative.endswith("/") else ""
+            tree.append("    " * len(parts) + parts[-1] + suffix)
         return "\n".join(tree)
 
     def collect_files(self):
-        """
-        Collect all files that would be included in the output.
-
-        Returns:
-            List of (relative_path, absolute_path, content) tuples
-        """
+        """Read selected files once and retain tree and exclusion metadata."""
         files = []
-        for root, _, filenames in os.walk(self.directory):
-            if self.should_ignore(root):
-                continue
+        self._tree_paths = []
+        self.last_report = {"unreadable": 0, "minified": 0}
+        for root, dirs, filenames in self.walk_project():
+            self._tree_paths.extend(
+                os.path.relpath(os.path.join(root, d), self.directory) + "/"
+                for d in dirs
+            )
             for filename in filenames:
                 file_path = os.path.join(root, filename)
                 if self.should_ignore(file_path):
                     continue
-                if filename in self.README_FILES and self.include_readme:
+                if self.is_readme(filename) and not self.include_readme:
                     continue
-                file_extension = os.path.splitext(filename)[1][1:]
-                if (
-                    file_extension in self.include_extensions
-                    and file_extension not in self.ignore_extensions
-                ):
-                    relative_path = os.path.relpath(file_path, self.directory)
-                    try:
-                        with open(file_path, "r", encoding="utf-8") as f:
-                            content = f.read()
-                    except (IOError, UnicodeDecodeError):
-                        continue
-                    if self.is_minified(filename, content):
-                        continue
-                    files.append((relative_path, file_path, content))
+                relative_path = os.path.relpath(file_path, self.directory)
+                self._tree_paths.append(relative_path)
+                if not self.select_file(filename):
+                    continue
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        content = f.read()
+                except (OSError, UnicodeDecodeError):
+                    self.last_report["unreadable"] += 1
+                    continue
+                if self.is_minified(filename, content):
+                    self.last_report["minified"] += 1
+                    continue
+                files.append((relative_path, file_path, content))
         return files
 
-    def catenate(self, file_overrides=None):
+    def catenate(self, file_overrides=None, token_limit=None, use_llm=False):
+        """Render source and a factual overview within an optional budget.
+
+        Overrides map paths to replacement text or (text, label); None skips
+        a file. Each call takes a fresh filesystem snapshot, including when
+        used by the watcher. Budgeting never rereads source or calls AI unless
+        use_llm is explicitly enabled.
         """
-        Concatenate all files into a single output string.
+        from .rendering import render_project
 
-        Args:
-            file_overrides: Optional dict mapping relative_path -> content or
-                           (content, label) tuple. If content is None, file is
-                           skipped. Label defaults to "summary" if not
-                           specified.
-        """
-        result = []
-        file_overrides = file_overrides or {}
-
-        result.append(f"### {self.title}\n\n")
-
-        if self.include_tree:
-            result.append("# Project Directory Structure\n")
-            result.append("```\n")
-            result.append(self.generate_directory_tree())
-            result.append("```\n\n")
-
-        if self.include_readme:
-            for readme_file in self.README_FILES:
-                readme_path = os.path.join(self.directory, readme_file)
-                if os.path.exists(readme_path) and not self.should_ignore(
-                    readme_path
-                ):
-                    with open(readme_path, "r", encoding="utf-8") as f:
-                        readme_content = f.read()
-                    result.append(f"# {readme_file}\n\n{readme_content}\n\n")
-                    break
-
-        for root, _, files in os.walk(self.directory):
-            if self.should_ignore(root):
-                continue
-            for file in files:
-                file_path = os.path.join(root, file)
-                if self.should_ignore(file_path):
-                    continue
-                if file in self.README_FILES and self.include_readme:
-                    continue
-                file_extension = os.path.splitext(file)[1][1:]
-                if (
-                    file_extension in self.include_extensions
-                    and file_extension not in self.ignore_extensions
-                ):
-                    relative_path = os.path.relpath(file_path, self.directory)
-
-                    if relative_path in file_overrides:
-                        override = file_overrides[relative_path]
-                        if isinstance(override, tuple):
-                            content, label = override
-                        else:
-                            content, label = override, "summary"
-                        if content is None:
-                            continue
-                        result.append(f"# {relative_path} ({label})\n")
-                        result.append(content)
-                    else:
-                        try:
-                            with open(file_path, "r", encoding="utf-8") as f:
-                                content = f.read()
-                        except (IOError, UnicodeDecodeError):
-                            continue
-                        if self.is_minified(file, content):
-                            continue
-                        result.append(f"# {relative_path}\n")
-                        result.append(content)
-
-                    result.append("\n\n")
-
-        return "".join(result)
+        if token_limit is not None and token_limit <= 0:
+            raise ValueError("token_limit must be positive")
+        files = self.collect_files()
+        return render_project(
+            self, files, file_overrides, token_limit, use_llm
+        )
 
     def count_tokens(self, s):
         try:
@@ -394,13 +433,25 @@ class Catenator:
             include_hidden=args.include_hidden,
             build_config=build_config,
             include_minified=args.include_minified,
+            include_overview=not args.no_overview,
+            exclude_paths=[args.output] if args.output else [],
         )
 
 
 class CatenatorEventHandler(FileSystemEventHandler):
-    def __init__(self, catenator, output_file, cooldown=15):
+    def __init__(
+        self,
+        catenator,
+        output_file,
+        cooldown=15,
+        token_limit=None,
+        use_llm=False,
+    ):
         self.catenator = catenator
         self.output_file = os.path.abspath(output_file)
+        self.catenator.exclude_paths.add(self.output_file)
+        self.token_limit = token_limit
+        self.use_llm = use_llm
         self.cooldown = cooldown
         self.last_update = 0
         self.update_timer = None
@@ -413,12 +464,19 @@ class CatenatorEventHandler(FileSystemEventHandler):
         if not event.is_directory:
             self.handle_write_event(event.src_path)
 
+    def on_deleted(self, event):
+        self.handle_write_event(event.src_path)
+
+    def on_moved(self, event):
+        self.handle_write_event(event.src_path)
+        self.handle_write_event(event.dest_path)
+
     def handle_write_event(self, file_path):
         if os.path.abspath(file_path) == self.output_file:
             return  # Ignore changes to the output file
         if self.catenator.should_ignore(file_path):
             return
-        print(f"Change detected: {file_path}")
+        print(f"Change detected: {file_path}", file=sys.stderr)
         self.schedule_update()
 
     def schedule_update(self):
@@ -437,10 +495,15 @@ class CatenatorEventHandler(FileSystemEventHandler):
         self.update_timer.start()
 
     def update_output(self):
-        catenated_content = self.catenator.catenate()
+        catenated_content = self.catenator.catenate(
+            token_limit=self.token_limit, use_llm=self.use_llm
+        )
         with open(self.output_file, "w", encoding="utf-8") as f:
             f.write(catenated_content)
-        print(f"Updated catenated content written to {self.output_file}")
+        print(
+            f"Updated catenated content written to {self.output_file}",
+            file=sys.stderr,
+        )
         self.last_update = time.time()
 
 
@@ -458,6 +521,11 @@ def main():
     )
     parser.add_argument(
         "--no-readme", action="store_true", help="Disable README inclusion"
+    )
+    parser.add_argument(
+        "--no-overview",
+        action="store_true",
+        help="Disable the automatic project overview",
     )
     parser.add_argument(
         "--include",
@@ -516,6 +584,10 @@ def main():
     )
 
     args = parser.parse_args()
+    if args.token_limit is not None and args.token_limit <= 0:
+        parser.error("--token-limit must be positive")
+    if args.watch and not args.output:
+        parser.error("--watch requires --output")
 
     build_config = {}
     if args.build:
@@ -532,135 +604,46 @@ def main():
                         and args.build in config["builds"]
                     ):
                         build_config = config["builds"][args.build]
-                        print(f"Using build '{args.build}' from {config_path}")
+                        print(
+                            f"Using build '{args.build}' from {config_path}",
+                            file=sys.stderr,
+                        )
                     else:
                         print(
                             f"Warning: Build '{args.build}' "
-                            f"not found in {config_path}"
+                            f"not found in {config_path}",
+                            file=sys.stderr,
                         )
                 except yaml.YAMLError as e:
-                    print(f"Error parsing {config_path}: {e}")
+                    print(f"Error parsing {config_path}: {e}", file=sys.stderr)
         else:
-            print(f"Warning: Config file {config_path} not found.")
+            print(
+                f"Warning: Config file {config_path} not found.",
+                file=sys.stderr,
+            )
 
     catenator = Catenator.from_cli_args(args, build_config=build_config)
 
-    # Handle token limit with progressive content reduction:
-    # 1. Full content for most important files
-    # 2. Summaries until 90% of budget
-    # 3. Docstrings until 100% of budget
-    # 4. Truncate if still over
-    file_overrides = {}
-    if args.token_limit:
-        from . import summarizer
-
-        files = catenator.collect_files()
-        if files:
-            ranked = summarizer.rank_files_by_importance(
-                catenator.directory, files
-            )
-
-            # Start by skipping all files, then add progressively
-            for rel_path, _, _, _ in ranked:
-                file_overrides[rel_path] = (None, "skipped")
-
-            budget_90 = int(args.token_limit * 0.9)
-            full_count = 0
-            summary_count = 0
-            docstring_count = 0
-
-            # Phase 1: Add full content for most important files
-            for rel_path, file_path, content, score in ranked:
-                del file_overrides[rel_path]  # Try adding full content
-                test_tokens = catenator.count_tokens(
-                    catenator.catenate(file_overrides)
-                )
-                if test_tokens > budget_90:
-                    # Can't fit full content, restore skip
-                    file_overrides[rel_path] = (None, "skipped")
-                    break
-                full_count += 1
-
-            # Phase 2: Add summaries until 90% budget
-            for rel_path, file_path, content, score in ranked:
-                if rel_path not in file_overrides:
-                    continue  # Already included as full
-                summary = summarizer.summarize_file(
-                    catenator.directory,
-                    rel_path,
-                    file_path,
-                    content,
-                    use_llm=args.llm,
-                )
-                file_overrides[rel_path] = (summary, "summary")
-                test_tokens = catenator.count_tokens(
-                    catenator.catenate(file_overrides)
-                )
-                if test_tokens > budget_90:
-                    # Can't fit summary, revert to skip
-                    file_overrides[rel_path] = (None, "skipped")
-                    break
-                summary_count += 1
-
-            # Phase 3: Add docstrings until 100% budget
-            for rel_path, file_path, content, score in ranked:
-                override = file_overrides.get(rel_path)
-                if override is None or override[0] is not None:
-                    continue  # Already included or has summary
-                docstring = summarizer.extract_docstring(content)
-                if not docstring:
-                    continue
-                file_overrides[rel_path] = (docstring, "docstring")
-                test_tokens = catenator.count_tokens(
-                    catenator.catenate(file_overrides)
-                )
-                if test_tokens > args.token_limit:
-                    # Can't fit docstring, revert to skip
-                    file_overrides[rel_path] = (None, "skipped")
-                    break
-                docstring_count += 1
-
-            # Clean up skipped files from overrides
-            file_overrides = {
-                k: v for k, v in file_overrides.items() if v[0] is not None
-            }
-
-            print(
-                f"Token budget: {full_count} full, "
-                f"{summary_count} summarized, "
-                f"{docstring_count} docstring-only"
-            )
-
-    catenated_content = catenator.catenate(file_overrides)
-
-    # Phase 4: Truncate if still over limit
-    if args.token_limit:
-        token_count = catenator.count_tokens(catenated_content)
-        if token_count > args.token_limit:
-            import tiktoken
-
-            encoding = tiktoken.get_encoding(catenator.TOKENIZER)
-            tokens = encoding.encode(
-                catenated_content, disallowed_special=()
-            )
-            truncated_tokens = tokens[: args.token_limit]
-            catenated_content = encoding.decode(truncated_tokens)
-            catenated_content += "\n\n[truncated]"
-            print(
-                f"Output truncated from {token_count} "
-                f"to {args.token_limit} tokens"
-            )
+    catenated_content = catenator.catenate(
+        token_limit=args.token_limit, use_llm=args.llm
+    )
 
     if args.output:
         output_path = os.path.abspath(args.output)
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(catenated_content)
-        print(f"Catenated content written to {output_path}")
+        print(f"Catenated content written to {output_path}", file=sys.stderr)
 
         if args.watch:
-            print(f"Watching for changes in {args.directory}...")
+            print(
+                f"Watching for changes in {args.directory}...", file=sys.stderr
+            )
             event_handler = CatenatorEventHandler(
-                catenator, output_path, cooldown=15
+                catenator,
+                output_path,
+                cooldown=15,
+                token_limit=args.token_limit,
+                use_llm=args.llm,
             )
             observer = Observer()
             observer.schedule(event_handler, args.directory, recursive=True)
@@ -673,13 +656,13 @@ def main():
             observer.join()
     elif args.clipboard:
         pyperclip.copy(catenated_content)
-        print("Catenated content copied to clipboard")
+        print("Catenated content copied to clipboard", file=sys.stderr)
     else:
-        print(catenated_content)
+        print(catenated_content, end="")
 
     if args.count_tokens:
         token_count = catenator.count_tokens(catenated_content)
-        print(f"Token count: {token_count}")
+        print(f"Token count: {token_count}", file=sys.stderr)
 
 
 if __name__ == "__main__":

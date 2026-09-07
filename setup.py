@@ -7,8 +7,16 @@ def get_metadata():
     with open("src/catenator/__init__.py", "r", encoding="utf-8") as f:
         content = f.read()
     metadata = {}
-    for key in ["__version__", "__project__", "__author__", "__email__", "__description__"]:
-        match = re.search(rf'^{key}\s*=\s*["\']([^"\']+)["\']', content, re.MULTILINE)
+    for key in [
+        "__version__",
+        "__project__",
+        "__author__",
+        "__email__",
+        "__description__",
+    ]:
+        match = re.search(
+            rf'^{key}\s*=\s*["\']([^"\']+)["\']', content, re.MULTILINE
+        )
         if match:
             metadata[key] = match.group(1)
     return metadata
@@ -40,10 +48,12 @@ setup(
         "pyperclip",
         "watchdog",
         "pyyaml",
+        "tomli>=2.0",
     ],
     extras_require={
         "token_counting": ["tiktoken"],
         "summarize": ["tiktoken", "openai"],
+        "dev": ["pytest", "tiktoken", "black", "flake8"],
     },
     entry_points={
         "console_scripts": [
@@ -56,10 +66,7 @@ setup(
         "License :: CC0 1.0 Universal (CC0 1.0) Public Domain Dedication",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
     ],
-    python_requires=">=3.6",
+    python_requires=">=3.9",
 )

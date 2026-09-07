@@ -1,6 +1,9 @@
 # Catenator
 
-Catenator is a Python tool for concatenating code files in a directory into a single output string.
+Catenator prepares a codebase for an agent's first read. It combines an
+automatic project overview, a directory tree, and source files in one document.
+With a token limit, it fits structural summaries and selected source into the
+budget. The default mode runs locally without AI or API credentials.
 
 ## Features
 
@@ -10,12 +13,15 @@ Catenator is a Python tool for concatenating code files in a directory into a si
 - Include README files in the output
 - Output to file, clipboard, or stdout
 - gitignore-style .catignore files
+- Automatic project facts from READMEs, manifests, and Python source
+- Source locations on structural summaries and project facts
+- Strict token budgets with coverage across source directories
 
 ## Installation
 
-Install using pip
+Requires Python 3.9 or later. Install with token counting for budgeted output:
    ```
-   pip install catenator
+   pip install 'catenator[token_counting]'
    ```
 
 ## Usage
@@ -32,12 +38,14 @@ Options:
 - `--clipboard`: Copy output to clipboard
 - `--no-tree`: Disable directory tree generation
 - `--no-readme`: Exclude README files from the output
+- `--no-overview`: Exclude the automatic project overview
 - `--include EXTENSIONS`: Comma-separated list of file extensions to include (replaces defaults)
 - `--ignore EXTENSIONS`: Comma-separated list of file extensions to ignore
 - `--count-tokens`: Output approximation of how many tokens in output (tiktoken cl100k_base)
 - `--watch`: Watch for changes and update output file automatically (requires --output)
 - `--ignore-tests`: Leave out tests from the concatenated output
 - `--include-minified`: Include minified/generated files (skipped by default)
+- `--include-hidden`: Include hidden files and directories, subject to ignore rules
 - `--token-limit N`: Keep output under N tokens by summarizing least important files
 - `--llm`: Use AI for richer summaries when using --token-limit (requires openai module)
 
@@ -57,9 +65,30 @@ catenator = Catenator(
     directory='/path/to/your/project',
     include_extensions=['py', 'js', 'ts'],
 )
-result = catenator.catenate()
+result = catenator.catenate(token_limit=6000)
 print(result)
 ```
+
+### Automatic Project Overview
+
+The overview appears by default. It reports language counts, the README's
+description, declared package commands and entry points, dependencies, and a
+Python module map with definitions and internal imports. Facts include source
+paths and line numbers where available. Manifests and source are inspected
+statically; Catenator never executes project code or the commands it discovers.
+
+Default discovery includes JSON, YAML, TOML, JSX/TSX and other source formats,
+plus files such as `requirements*.txt`, `Makefile`, `Dockerfile`, `go.mod`,
+and nested READMEs. GitHub workflow YAML and `.gitlab-ci.yml` are included
+without enabling all hidden files. `.catignore` still applies, and secret
+`.env` files remain excluded. An explicit `--include` replaces the default
+source and manifest selection; README inclusion is controlled separately.
+
+Structural summaries preserve complete Python signatures, decorators,
+imports, selected constants and docstrings, with source line references.
+JavaScript/TypeScript declarations, document headings, JSON keys, and
+configuration sections have lightweight extractors. Unsupported formats are
+identified explicitly when full source does not fit.
 
 ## .catignore File
 
@@ -67,8 +96,8 @@ The .catignore file allows you to specify files and directories that should be e
 
 Catenator ships with a comprehensive `default.catignore` covering build
 artifacts, vendored libraries, lockfiles, coverage reports, generated docs,
-media files, and ML artifacts. The defaults always apply; a project's
-`.catignore` adds patterns on top of them rather than replacing them.
+media files, and ML artifacts. In normal mode, a project's `.catignore` adds
+patterns on top of these defaults. Named builds supply their own filters.
 
 ### Syntax
 
@@ -118,7 +147,10 @@ To use a build, use the `--build` command-line option:
 catenator /path/to/your/project --build <build_name>
 ```
 
-When you use the `--build` option, the catenator will ignore `.catignore` and other filtering flags, and will instead rely solely on the `whitelist` and `blacklist` defined in the specified build.
+Builds select files using their `whitelist` and `blacklist`, including formats
+outside the default extension list. `.catignore` and the hidden-file filter are
+bypassed in build mode. Always-ignored directories, explicit `--ignore`
+extensions, `--no-readme`, and the minified-file check still apply.
 
 ### Example `.catconfig.yaml`
 
@@ -145,27 +177,43 @@ In this example:
 
 ## Token Limit and Summarization
 
-When a project exceeds a specified token limit, catenator uses a progressive approach to fit within the budget:
+For a single onboarding document with a strict token budget:
 
 ```
 catenator /path/to/project --token-limit 10000
 ```
 
 This will:
-1. Rank all files by importance to understanding the project
-2. Include full content for the most important files
-3. Add summaries for less important files until 90% of budget is used
-4. Add just docstrings for remaining files until 100% of budget
-5. Truncate if still over the limit
 
-By default, summaries are structural extracts (function/class signatures and docstrings). For richer AI-generated summaries, add the `--llm` flag:
+1. Discover and read selected files once, pruning ignored directories.
+2. Build a bounded overview and tree, reserving room for a coverage report.
+3. Rank files using project metadata, entry points, public package wiring,
+   and incoming Python imports, with stable path ordering for ties.
+4. Include compact outlines across directories, then expand important files
+   into structural summaries or full source as space permits.
+5. Fit complete sections within the limit, including headers and fences.
+
+The coverage report counts full files, summaries, outlines, and omitted files,
+along with unreadable and minified files. Extremely small budgets may only fit
+a title, or no text. Counts use `cl100k_base`; other tokenizers may differ.
+Status messages and `--count-tokens` go to stderr so redirected stdout contains
+only the document. Watch updates use the same budget and exclude the output
+file from subsequent discovery.
+
+The default summaries are automatic structural extracts. The optional AI
+backend remains available with the `summarize` extra and `--llm`:
 
 ```
 catenator /path/to/project --token-limit 10000 --llm
 ```
 
-Files are labeled in the output: `(summary)` for summarized files, `(docstring)` for docstring-only files. Summaries are cached in `~/.catenator/summaries/`. Token counting requires tiktoken; AI summaries require the `openai` module.
+Files are labeled `(summary)` or `(outline)` when reduced. The automatic CLI
+extracts structure from its in-memory source snapshot; optional AI file
+summaries are cached in `~/.catenator/summaries/`.
 
-## License
+## Development
 
-This project is licensed under the Creative Commons Zero v1.0 Universal (CC0-1.0) License.
+```sh
+pip install -e '.[dev]'
+python -m pytest
+```

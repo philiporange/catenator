@@ -54,13 +54,22 @@
     {
       "path": "setup.py",
       "description": "Package setup configuration defining dependencies, console entry points, and distribution metadata."
+    },
+    {
+      "path": "src/catenator/project_summary.py",
+      "description": "Statically extracts project descriptions, dependencies, declared commands, and Python module facts with source locations."
+    },
+    {
+      "path": "src/catenator/rendering.py",
+      "description": "Allocates tokens to the overview, tree, source summaries, and complete file sections from one discovery snapshot."
     }
   ],
   "dependencies": {
     "core": [
       "pyperclip",
       "watchdog",
-      "pyyaml"
+      "pyyaml",
+      "tomli>=2.0"
     ],
     "optional": {
       "token_counting": [
@@ -90,7 +99,11 @@
     "AI-powered file summaries (via OpenAI-compatible API)",
     "File importance ranking",
     "Summary caching in ~/.catenator/summaries/",
-    "Clipboard output support"
+    "Clipboard output support",
+    "Automatic project overview from static source and manifests",
+    "Strict whole-section token budgets with directory coverage",
+    "Source locations in structural summaries",
+    "Project manifests, CI configuration, and nested README discovery"
   ],
   "repository": {
     "type": "git",
@@ -101,17 +114,14 @@
   "license": "CC0-1.0",
   "author": "Philip Orange",
   "author_email": "git@philiporange.com",
-  "version": "0.2.7",
-  "python_requires": ">=3.6",
+  "version": "0.3.0",
+  "python_requires": ">=3.9",
   "development_status": "Alpha",
   "classifiers": [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.6",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9"
   ],
   "use_cases": [

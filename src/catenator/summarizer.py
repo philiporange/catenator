@@ -1,27 +1,30 @@
 """
-File importance ranking and summarization for catenator.
+Deterministic file importance ranking and structural summarization.
 
 When a project exceeds the token limit, this module:
 1. Ranks files by importance using fast heuristics (entry points, tests, etc.)
-2. Summarizes the least important files on-demand to reduce tokens
+2. Summarizes the least important files on demand to reduce tokens
 3. Caches summaries in ~/.catenator/summaries/ for reuse, keyed by file hash
    and summary backend
 
-Summaries are generated lazily - only when needed to fit within the token limit.
-By default, extracts function/class signatures and docstrings as a structural
-summary. With --llm, uses the OpenAI Python client for richer summaries. The
+Summaries are generated lazily, only when needed to fit within the token
+limit.
+By default, extracts bounded declarations, imports, documentation outlines,
+and configuration keys instead of copying arbitrary file prefixes. With --llm,
+uses the OpenAI Python client for richer summaries. The
 target project's .env is loaded before each LLM summary so
 CATENATOR_SUMMARIZER_MODEL, CATENATOR_SUMMARIZER_API_KEY, and
 CATENATOR_SUMMARIZER_BASE_URL can configure the default backend.
 """
 
 import ast
+import copy
 import os
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Optional
-
 
 SUMMARY_CACHE_DIR = Path.home() / ".catenator" / "summaries"
 IMPORTANCE_CACHE_FILENAME = ".importance_cache.json"
@@ -34,17 +37,19 @@ OPENAI_API_KEY_ENV = "OPENAI_API_KEY"
 OPENAI_BASE_URL_ENV = "OPENAI_BASE_URL"
 DEEPSEEK_API_KEY_ENV = "DEEPSEEK_API_KEY"
 DEEPSEEK_BASE_URL_ENV = "DEEPSEEK_BASE_URL"
+STRUCTURAL_CACHE_CONTEXT = "structural:v2"
 
 
 def is_test_file(rel_path: str) -> bool:
     """Check if a file is a test file."""
-    path_lower = rel_path.lower()
-    filename = os.path.basename(path_lower)
+    parts = rel_path.lower().replace("\\", "/").split("/")
+    filename = parts[-1]
     return (
-        "/test" in path_lower
-        or path_lower.startswith("test")
+        any(part in {"test", "tests", "__tests__"} for part in parts)
         or filename.startswith("test_")
         or "_test." in filename
+        or ".test." in filename
+        or ".spec." in filename
         or filename == "conftest.py"
     )
 
@@ -56,7 +61,7 @@ def extract_docstring(content: str) -> str:
     """
     try:
         tree = ast.parse(content)
-    except SyntaxError:
+    except (SyntaxError, ValueError):
         return ""
 
     if (
@@ -70,83 +75,224 @@ def extract_docstring(content: str) -> str:
     return ""
 
 
-def extract_signatures(content: str) -> str:
-    """
-    Extract function/class signatures, docstrings, and return statements from Python code.
-    Falls back to first 500 chars for non-Python or unparseable files.
-    """
+def _bounded(
+    entries: list[str], line_limit: int = 80, char_limit: int = 12000
+) -> str:
+    """Bound by physical lines and characters while keeping entries whole."""
+    output: list[str] = []
+    characters = 0
+    for entry in entries:
+        lines = entry.splitlines() or [""]
+        required = len(entry) + (1 if output else 0)
+        if (
+            len(output) + len(lines) >= line_limit
+            or characters + required > char_limit - 25
+        ):
+            output.append("... (outline truncated)")
+            break
+        output.extend(lines)
+        characters += required
+    return "\n".join(output).rstrip()
+
+
+def _extract_python_structure(content: str) -> Optional[str]:
     try:
         tree = ast.parse(content)
-    except SyntaxError:
-        # Not valid Python, return truncated content
-        return content[:500] + "\n..." if len(content) > 500 else content
-
-    lines = content.splitlines()
-    result = []
-
-    def get_docstring(node) -> Optional[str]:
-        """Extract docstring from a node if present."""
-        if (
-            node.body
-            and isinstance(node.body[0], ast.Expr)
-            and isinstance(node.body[0].value, ast.Constant)
-            and isinstance(node.body[0].value.value, str)
-        ):
-            doc = node.body[0].value.value
-            return doc[:200] + "..." if len(doc) > 200 else doc
+    except (SyntaxError, ValueError):
         return None
+    source_lines = content.splitlines()
+    result = ["Python structure:"]
+    module_doc = ast.get_docstring(tree, clean=False)
+    if module_doc:
+        result.append(
+            f'  Module: """{module_doc.strip().splitlines()[0][:200]}"""'
+        )
 
-    def process_node(node, indent=""):
-        """Process a single AST node."""
-        if isinstance(node, ast.ClassDef):
-            result.append(f"{indent}{lines[node.lineno - 1].strip()}")
-            doc = get_docstring(node)
-            if doc:
-                result.append(f'{indent}    """{doc}"""')
-            # Process methods inside the class
-            for child in node.body:
-                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    process_node(child, indent + "    ")
-            result.append("")
+    def declaration(node, indent="  "):
+        decorators = getattr(node, "decorator_list", [])
+        start = min([node.lineno] + [item.lineno for item in decorators])
+        first = node.body[0]
+        body_start = min(
+            [first.lineno]
+            + [item.lineno for item in getattr(first, "decorator_list", [])]
+        )
+        end = max(node.lineno, body_start - 1)
+        span = str(start) if start == end else f"{start}-{end}"
+        outline_node = copy.copy(node)
+        outline_node.body = [ast.Pass()]
+        rendered = ast.unparse(ast.fix_missing_locations(outline_node))
+        rendered_lines = rendered.splitlines()
+        if rendered_lines and rendered_lines[-1].strip() == "pass":
+            rendered_lines.pop()
+        rendered = "\n".join(rendered_lines).rstrip()
+        if len(rendered_lines) > 30 or len(rendered) > 2000:
+            kind = "class" if isinstance(node, ast.ClassDef) else "function"
+            rendered = (
+                f"{kind} {node.name}: ... (declaration omitted: too large)"
+            )
+        result.append(
+            f"{indent}[lines {span}] " + rendered.replace("\n", "\n" + indent)
+        )
+        doc = ast.get_docstring(node, clean=False)
+        if doc:
+            result.append(
+                f'{indent}  """{doc.strip().splitlines()[0][:160]}"""'
+            )
 
-        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            result.append(f"{indent}{lines[node.lineno - 1].strip()}")
-            doc = get_docstring(node)
-            if doc:
-                result.append(f'{indent}    """{doc}"""')
-            # Return statements
-            for child in ast.walk(node):
-                if isinstance(child, ast.Return) and child.value is not None:
-                    try:
-                        return_line = lines[child.lineno - 1].strip()
-                        result.append(f"{indent}    {return_line}")
-                    except IndexError:
-                        pass
-            result.append("")
-
-    # Get module docstring
-    doc = get_docstring(tree)
-    if doc:
-        result.append(f'"""{doc}"""')
-        result.append("")
-
-    # Process top-level nodes in order
     for node in tree.body:
-        if isinstance(
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            text = (
+                ast.get_source_segment(content, node)
+                or source_lines[node.lineno - 1]
+            )
+            if len(text) > 500 or text.count("\n") > 8:
+                text = f"{type(node).__name__} (import omitted: too large)"
+            result.append(f"  [line {node.lineno}] {text.strip()}")
+        elif isinstance(
             node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
         ):
-            process_node(node)
+            declaration(node)
+            if isinstance(node, ast.ClassDef):
+                for child in node.body:
+                    if isinstance(
+                        child, (ast.FunctionDef, ast.AsyncFunctionDef)
+                    ):
+                        declaration(child, "    ")
+        elif isinstance(node, (ast.Assign, ast.AnnAssign)):
+            targets = (
+                node.targets if isinstance(node, ast.Assign) else [node.target]
+            )
+            names = [
+                target.id for target in targets if isinstance(target, ast.Name)
+            ]
+            public = [name for name in names if not name.startswith("_")]
+            annotation = (
+                ast.unparse(node.annotation)
+                if isinstance(node, ast.AnnAssign)
+                else ""
+            )
+            selected = (
+                "__all__" in names
+                or any(
+                    name.isupper()
+                    or name.endswith(("Type", "Protocol", "Alias"))
+                    for name in public
+                )
+                or annotation.endswith("TypeAlias")
+            )
+            if selected:
+                text = (
+                    ast.get_source_segment(content, node)
+                    or source_lines[node.lineno - 1]
+                )
+                if len(text) <= 300 and "\n" not in text:
+                    result.append(f"  [line {node.lineno}] {text.strip()}")
+    return (
+        _bounded(result)
+        if len(result) > 1
+        else "Python module (no public structure detected)."
+    )
 
-    if not result:
-        return content[:500] + "\n..." if len(content) > 500 else content
 
-    return "\n".join(result)
+def _extract_non_python_structure(content: str, relative_path: str) -> str:
+    suffix = Path(relative_path).suffix.lower()
+    name = Path(relative_path).name.lower()
+    lines = content.splitlines()
+    result: list[str] = []
+    if suffix in {".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"}:
+        result.append("JavaScript/TypeScript structure:")
+        pattern = re.compile(
+            r"^\s*(?:export\s+(?:default\s+)?)?(?:declare\s+)?"
+            r"(?:async\s+)?"
+            r"(?:function|class|interface|type|enum|const|let|var)"
+            r"\b|^\s*(?:import|export)\b"
+        )
+        for number, line in enumerate(lines, 1):
+            if pattern.search(line):
+                result.append(f"  [line {number}] {line.strip()[:240]}")
+        if len(result) > 1:
+            return _bounded(result)
+        return "JavaScript/TypeScript module (no exports detected)."
+    if suffix in {".md", ".mdx", ".rst"} or name.startswith("readme"):
+        result.append("Document outline:")
+        fence = None
+        for number, line in enumerate(lines, 1):
+            marker = re.match(r"^\s*(`{3,}|~{3,})", line)
+            if marker:
+                if fence is None:
+                    fence = marker[0].strip()
+                elif marker[0].strip()[0] == fence[0] and len(
+                    marker[0].strip()
+                ) >= len(fence):
+                    fence = None
+                continue
+            if fence:
+                continue
+            if re.match(r"^#{1,6}\s+\S", line):
+                result.append(f"  [line {number}] {line.strip()[:240]}")
+        return (
+            _bounded(result)
+            if len(result) > 1
+            else "Document (no headings detected)."
+        )
+    if suffix == ".json":
+        try:
+            value = json.loads(content)
+        except (ValueError, TypeError):
+            return "JSON file (invalid or incomplete; structure unavailable)."
+        if isinstance(value, dict):
+            keys = list(value)[:40]
+            return (
+                "JSON object keys:\n  "
+                + "\n  ".join(map(str, keys))
+                + ("\n  ..." if len(value) > 40 else "")
+            )
+        count = len(value) if isinstance(value, list) else 1
+        return f"JSON {type(value).__name__} with {count} value(s)."
+    if suffix in {".toml", ".ini", ".cfg", ".yaml", ".yml"} or name in {
+        "dockerfile",
+        "makefile",
+    }:
+        result.append("Configuration structure:")
+        for number, line in enumerate(lines, 1):
+            stripped = line.strip()
+            if re.match(r"^\[[^]]+\]$", stripped) or re.match(
+                r"^[A-Za-z0-9_.-]+\s*[:=]", stripped
+            ):
+                key = re.split("[:=]", stripped, 1)[0][:200]
+                result.append(f"  [line {number}] {key}")
+        return (
+            _bounded(result)
+            if len(result) > 1
+            else "Configuration file (no sections or keys detected)."
+        )
+    file_type = suffix.lstrip(".").upper() or "Text"
+    return f"{file_type} file; no structural extractor available."
+
+
+def extract_signatures(
+    content: str, relative_path: Optional[str] = None
+) -> str:
+    """
+    Extract a bounded structural summary, using the path to select a parser.
+    """
+    path = relative_path or ""
+    if Path(path).suffix.lower() == ".py" or not path:
+        python = _extract_python_structure(content)
+        if python is not None:
+            return python
+        if path.endswith(".py"):
+            return (
+                "Python file (syntax invalid or incomplete; "
+                "structure unavailable)."
+            )
+    return _extract_non_python_structure(content, path)
 
 
 def get_project_cache_dir(project_path: str) -> Path:
     """Get the cache directory for a project's summaries."""
     abs_path = os.path.abspath(project_path)
-    # Convert path to safe directory name: /home/sam/project -> _home_sam_project
+    # Convert /home/sam/project to the safe name _home_sam_project.
     safe_name = abs_path.replace("/", "_").lstrip("_")
     return SUMMARY_CACHE_DIR / safe_name
 
@@ -325,8 +471,9 @@ def summarize_with_openai(
     base_url: Optional[str],
 ) -> Optional[str]:
     """Generate an LLM summary with the OpenAI Python client."""
-    prompt = f"""Summarize this source file concisely for a developer who needs to understand the codebase.
-Focus on: purpose, key functions/classes, dependencies, and how it fits the project.
+    prompt = f"""Summarize this source file concisely for a developer who needs
+to understand the codebase.
+Focus on its purpose, key functions/classes, dependencies, and project role.
 Keep it under 200 words.
 
 File: {relative_path}
@@ -354,44 +501,77 @@ def estimate_importance(rel_path: str, content: str) -> float:
     """
     Estimate file importance using heuristics. Higher = more important.
 
-    Heuristics:
-    - Entry points (main, __main__, cli) are most important
-    - Test files, examples, fixtures are least important
-    - Config/setup files are less important
-    - Core source files (not in subdirs like utils/) are more important
+    Project guides and manifests lead, followed by production entry points.
+    Tests remain represented without receiving entry-point boosts. Public
+    package wiring and ordinary source modules receive middle-range scores.
     """
     path_lower = rel_path.lower()
     filename = os.path.basename(path_lower)
 
-    # High importance: entry points
+    if filename in {
+        "readme",
+        "readme.md",
+        "agents.md",
+        "package.json",
+        "pyproject.toml",
+        "cargo.toml",
+        "go.mod",
+    }:
+        return 0.98
+
+    # Tests are classified before filename and main-guard entry heuristics.
+    if is_test_file(rel_path):
+        return 0.3
+
+    # High importance: conventional or proven entry points
     if filename in ("main.py", "__main__.py", "cli.py", "app.py", "server.py"):
         return 0.95
-    if "main" in filename or "entry" in filename:
-        return 0.85
+    if filename.endswith(".py"):
+        try:
+            tree = ast.parse(content)
+            for node in tree.body:
+                if not isinstance(node, ast.If) or not isinstance(
+                    node.test, ast.Compare
+                ):
+                    continue
+                comparison = node.test
+                if len(comparison.ops) != 1 or not isinstance(
+                    comparison.ops[0], ast.Eq
+                ):
+                    continue
+                operands = (comparison.left, comparison.comparators[0])
+                has_name = any(
+                    isinstance(value, ast.Name) and value.id == "__name__"
+                    for value in operands
+                )
+                has_main = any(
+                    isinstance(value, ast.Constant)
+                    and value.value == "__main__"
+                    for value in operands
+                )
+                if has_name and has_main:
+                    return 0.9
+        except (SyntaxError, ValueError):
+            pass
 
-    # Low importance: tests, examples, fixtures
-    if (
-        "/test" in path_lower
-        or path_lower.startswith("test")
-        or filename.startswith("test_")
-        or "_test." in filename
-    ):
-        return 0.1
+    # Examples and fixtures usually explain less of the architecture.
     if "/example" in path_lower or "/fixture" in path_lower:
         return 0.15
 
-    # Low importance: config, setup, boilerplate
-    if filename in ("setup.py", "conftest.py", "config.py", "__init__.py"):
-        return 0.2
+    # Package wiring and configuration describe public surface and setup.
+    if filename in ("setup.py", "conftest.py", "config.py"):
+        return 0.45
+    if filename == "__init__.py":
+        has_public_wiring = "import " in content or "__all__" in content
+        return 0.55 if has_public_wiring else 0.35
     if filename.endswith((".json", ".yaml", ".yml", ".toml", ".cfg", ".ini")):
-        return 0.25
+        return 0.5
 
     # Medium-low: utilities, helpers
     if "/util" in path_lower or "/helper" in path_lower or "util" in filename:
         return 0.35
 
-    # Default: moderate importance, slightly favor shorter files (likely core logic)
-    # and files closer to root
+    # Default: moderate importance, favoring files closer to the project root.
     depth = rel_path.count("/")
     depth_penalty = min(depth * 0.05, 0.2)
     return 0.6 - depth_penalty
@@ -401,7 +581,7 @@ def rank_files_by_importance(
     project_path: str, files: list[tuple[str, str, str]]
 ) -> list[tuple[str, str, str, float]]:
     """
-    Rank files by their importance to understanding the project using heuristics.
+    Rank files by importance using deterministic project heuristics.
 
     Args:
         project_path: Root path of the project
@@ -415,12 +595,66 @@ def rank_files_by_importance(
         return []
 
     result = []
+    modules: dict[str, str] = {}
+    module_context: dict[str, tuple[str, bool]] = {}
+    for rel_path, _, _ in files:
+        if rel_path.endswith(".py"):
+            raw_module = rel_path[:-3].replace("/", ".")
+            is_package = raw_module.endswith(".__init__")
+            module = raw_module.removesuffix(".__init__")
+            aliases = {module}
+            if module.startswith("src."):
+                aliases.add(module[4:])
+            for alias in aliases:
+                modules[alias] = rel_path
+            canonical = module[4:] if module.startswith("src.") else module
+            module_context[rel_path] = (canonical, is_package)
+
+    dependency_edges: set[tuple[str, str]] = set()
+    for rel_path, _, content in files:
+        if not rel_path.endswith(".py"):
+            continue
+        try:
+            tree = ast.parse(content)
+        except (SyntaxError, ValueError):
+            continue
+        current, is_package = module_context[rel_path]
+        package = (
+            current
+            if is_package
+            else (current.rsplit(".", 1)[0] if "." in current else "")
+        )
+        for node in ast.walk(tree):
+            names = []
+            if isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                base = node.module or ""
+                if node.level:
+                    parts = package.split(".") if package else []
+                    prefix = ".".join(
+                        parts[: max(0, len(parts) - node.level + 1)]
+                    )
+                    base = ".".join(filter(None, (prefix, base)))
+                names = [base] + [
+                    f"{base}.{alias.name}" for alias in node.names
+                ]
+            for name in names:
+                target = modules.get(name)
+                if target and target != rel_path:
+                    dependency_edges.add((rel_path, target))
+
+    incoming: dict[str, int] = {}
+    for _, target in dependency_edges:
+        incoming[target] = incoming.get(target, 0) + 1
+
     for rel_path, file_path, content in files:
         score = estimate_importance(rel_path, content)
+        score = min(1.0, score + min(incoming.get(rel_path, 0) * 0.06, 0.24))
         result.append((rel_path, file_path, content, score))
 
-    # Sort by importance (highest first)
-    result.sort(key=lambda x: x[3], reverse=True)
+    # Path tie-breaking makes output independent of the caller's input order.
+    result.sort(key=lambda item: (-item[3], item[0]))
     return result
 
 
@@ -445,7 +679,7 @@ def summarize_file(
         model_name = None
         api_key = None
         base_url = None
-        summary_context = "structural"
+        summary_context = STRUCTURAL_CACHE_CONTEXT
 
     # Check cache
     cached = load_cached_summary(
@@ -460,16 +694,18 @@ def summarize_file(
                 relative_path, content, model_name, api_key, base_url
             )
         except Exception:
-            summary = extract_signatures(content)
-            summary_context = "structural"
+            summary = extract_signatures(content, relative_path)
+            summary_context = STRUCTURAL_CACHE_CONTEXT
         else:
             if llm_summary:
                 summary = llm_summary
             else:
-                summary = extract_signatures(content)
-                summary_context = "structural"
+                summary = extract_signatures(content, relative_path)
+                summary_context = STRUCTURAL_CACHE_CONTEXT
     else:
-        summary = extract_signatures(content)
+        summary = extract_signatures(content, relative_path)
+        if use_llm:
+            summary_context = STRUCTURAL_CACHE_CONTEXT
 
     save_summary(
         project_path, relative_path, file_path, summary, summary_context
