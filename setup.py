@@ -1,3 +1,5 @@
+"""Package Catenator's CLI, structural renderer, and optional AI integrations."""
+
 import re
 from setuptools import setup, find_packages
 
@@ -49,10 +51,13 @@ setup(
         "watchdog",
         "pyyaml",
         "tomli>=2.0",
+        "requests",
+        "python-dotenv",
     ],
     extras_require={
         "token_counting": ["tiktoken"],
         "summarize": ["tiktoken", "openai"],
+        "jev": ["tiktoken"],
         "dev": ["pytest", "tiktoken", "black", "flake8"],
     },
     entry_points={

@@ -6,7 +6,10 @@ and manifests. Files are discovered once, in stable order, and ignored trees
 are pruned before descent. Budgeted output covers the main directories with
 outlines before expanding important files into structural summaries or full
 source. Whole sections, including the overview and tree, share a strict token
-budget. The optional --llm flag still enables AI file summaries.
+budget. The optional --llm flag enables AI file summaries. --jev evaluates
+all selected source in batches to score inclusion, reuses general ratings for
+known file paths, and optionally reranks them for --prompt using general project
+context. API usage and estimated cost are reported separately from output.
 
 Ignore handling: vendored/generated directories (node_modules, __pycache__,
 venv, .git, etc.) are always excluded, in every mode, at any depth. The
@@ -147,6 +150,8 @@ class Catenator:
             os.path.abspath(path) for path in (exclude_paths or [])
         }
         self.last_report = {}
+        self.last_jev_report = []
+        self.last_jev_scores = {}
 
     def load_cat_ignore(self):
         """
@@ -383,21 +388,58 @@ class Catenator:
                 files.append((relative_path, file_path, content))
         return files
 
-    def catenate(self, file_overrides=None, token_limit=None, use_llm=False):
+    def catenate(
+        self,
+        file_overrides=None,
+        token_limit=None,
+        use_llm=False,
+        use_jev=False,
+        prompt=None,
+        refresh_scores=False,
+    ):
         """Render source and a factual overview within an optional budget.
 
         Overrides map paths to replacement text or (text, label); None skips
         a file. Each call takes a fresh filesystem snapshot, including when
         used by the watcher. Budgeting never rereads source or calls AI unless
-        use_llm is explicitly enabled.
+        use_llm or use_jev is explicitly enabled. Jev scores use this same
+        snapshot; prompt scoring follows a cached general scoring pass.
         """
         from .rendering import render_project
 
         if token_limit is not None and token_limit <= 0:
             raise ValueError("token_limit must be positive")
+        if prompt is not None and (not use_jev or not prompt.strip()):
+            raise ValueError("prompt requires Jev mode and non-empty text")
+        if refresh_scores and not use_jev:
+            raise ValueError("refresh_scores requires Jev mode")
+        self.last_jev_report = []
+        self.last_jev_scores = {}
         files = self.collect_files()
+        file_scores = None
+        if use_jev:
+            from .jev import score_project
+
+            scoring_files = []
+            for path, absolute, content in files:
+                replacement = (file_overrides or {}).get(path, content)
+                content = (
+                    replacement[0]
+                    if isinstance(replacement, tuple)
+                    else replacement
+                )
+                if content is not None:
+                    scoring_files.append((path, absolute, content))
+            file_scores = score_project(
+                self, scoring_files, prompt=prompt, refresh=refresh_scores
+            )
         return render_project(
-            self, files, file_overrides, token_limit, use_llm
+            self,
+            files,
+            file_overrides,
+            token_limit,
+            use_llm,
+            file_scores=file_scores,
         )
 
     def count_tokens(self, s):
@@ -446,12 +488,16 @@ class CatenatorEventHandler(FileSystemEventHandler):
         cooldown=15,
         token_limit=None,
         use_llm=False,
+        use_jev=False,
+        prompt=None,
     ):
         self.catenator = catenator
         self.output_file = os.path.abspath(output_file)
         self.catenator.exclude_paths.add(self.output_file)
         self.token_limit = token_limit
         self.use_llm = use_llm
+        self.use_jev = use_jev
+        self.prompt = prompt
         self.cooldown = cooldown
         self.last_update = 0
         self.update_timer = None
@@ -495,9 +541,18 @@ class CatenatorEventHandler(FileSystemEventHandler):
         self.update_timer.start()
 
     def update_output(self):
-        catenated_content = self.catenator.catenate(
-            token_limit=self.token_limit, use_llm=self.use_llm
-        )
+        from .jev_client import JevError
+
+        try:
+            catenated_content = self.catenator.catenate(
+                token_limit=self.token_limit,
+                use_llm=self.use_llm,
+                use_jev=self.use_jev,
+                prompt=self.prompt,
+            )
+        except (JevError, ValueError) as error:
+            print(f"Catenator update failed: {error}", file=sys.stderr)
+            return
         with open(self.output_file, "w", encoding="utf-8") as f:
             f.write(catenated_content)
         print(
@@ -582,12 +637,30 @@ def main():
         action="store_true",
         help="Use AI to generate rich summaries (requires openai module)",
     )
+    parser.add_argument(
+        "--jev",
+        action="store_true",
+        help="Score file inclusion with Jev (requires TYPESAFE_API_KEY)",
+    )
+    parser.add_argument(
+        "--prompt",
+        help="Rerank Jev scores for an instruction or query",
+    )
+    parser.add_argument(
+        "--refresh-scores",
+        action="store_true",
+        help="Recompute cached Jev scores",
+    )
 
     args = parser.parse_args()
     if args.token_limit is not None and args.token_limit <= 0:
         parser.error("--token-limit must be positive")
     if args.watch and not args.output:
         parser.error("--watch requires --output")
+    if args.prompt is not None and (not args.jev or not args.prompt.strip()):
+        parser.error("--prompt requires --jev and non-empty text")
+    if args.refresh_scores and not args.jev:
+        parser.error("--refresh-scores requires --jev")
 
     build_config = {}
     if args.build:
@@ -624,9 +697,18 @@ def main():
 
     catenator = Catenator.from_cli_args(args, build_config=build_config)
 
-    catenated_content = catenator.catenate(
-        token_limit=args.token_limit, use_llm=args.llm
-    )
+    from .jev_client import JevError
+
+    try:
+        catenated_content = catenator.catenate(
+            token_limit=args.token_limit,
+            use_llm=args.llm,
+            use_jev=args.jev,
+            prompt=args.prompt,
+            refresh_scores=args.refresh_scores,
+        )
+    except (JevError, ValueError) as error:
+        parser.exit(1, f"catenator: {error}\n")
 
     if args.output:
         output_path = os.path.abspath(args.output)
@@ -644,6 +726,8 @@ def main():
                 cooldown=15,
                 token_limit=args.token_limit,
                 use_llm=args.llm,
+                use_jev=args.jev,
+                prompt=args.prompt,
             )
             observer = Observer()
             observer.schedule(event_handler, args.directory, recursive=True)

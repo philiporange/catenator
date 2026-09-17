@@ -16,6 +16,7 @@ budget. The default mode runs locally without AI or API credentials.
 - Automatic project facts from READMEs, manifests, and Python source
 - Source locations on structural summaries and project facts
 - Strict token budgets with coverage across source directories
+- Jev file importance scoring, prompt-specific ranking, and API cost reporting
 
 ## Installation
 
@@ -48,6 +49,9 @@ Options:
 - `--include-hidden`: Include hidden files and directories, subject to ignore rules
 - `--token-limit N`: Keep output under N tokens by summarizing least important files
 - `--llm`: Use AI for richer summaries when using --token-limit (requires openai module)
+- `--jev`: Use Jev to score whether each file should be verbatim, summarized, or ignored
+- `--prompt TEXT`: Rerank Jev scores for an instruction or query (requires `--jev`)
+- `--refresh-scores`: Recompute Jev scores instead of using the cache (requires `--jev`)
 
 Example:
 ```
@@ -210,6 +214,109 @@ catenator /path/to/project --token-limit 10000 --llm
 Files are labeled `(summary)` or `(outline)` when reduced. The automatic CLI
 extracts structure from its in-memory source snapshot; optional AI file
 summaries are cached in `~/.catenator/summaries/`.
+
+## Jev file scoring
+
+Install token counting and set `TYPESAFE_API_KEY` in your environment,
+`~/.env`, or the target project's `.env`:
+
+```sh
+pip install -e '.[jev]'
+catenator /path/to/project --jev --token-limit 12000
+catenator /path/to/project --jev --token-limit 6000 \
+  --prompt "Fix the parser's handling of escaped quotes"
+```
+
+The general pass sends every eligible file's full contents to Jev and asks a
+separate scoring question for each file. Files share request context, and
+questions are batched to avoid repeating the project for every file. This
+uses the same discovery snapshot and ignore rules as normal Catenator.
+Selected source is sent to the configured TypeSafe endpoint.
+
+Scores use three ordered levels: 0 means ignore, 1 means summarize, and 2
+means verbatim. Fractional scores below 0.5 omit the file body; scores from
+0.5 to below 1.5 cap it at a structural summary; scores of 1.5 or higher
+allow full source. The overview and directory tree can still mention omitted
+files. `--token-limit` can further reduce or omit files to fit the output.
+Without a token limit, the score's inclusion decision still applies.
+
+For larger projects, source is packed into roughly 28,000-token states with
+a shared structural project overview. Individual files exceeding a state
+are split without dropping source characters; their highest part score
+determines inclusion. Every file is evaluated, but each judgment sees only
+its source batch plus shared project context. Request packing also budgets
+question text: up to 30,000 estimated tokens for state plus one question and
+60,000 for state plus all questions. These counts use `cl100k_base` and leave
+headroom for Jev's different tokenizer. API size errors are reported clearly.
+
+With `--prompt`, Catenator first obtains general scores, then builds a general
+Jev document with a high context budget (up to approximately 27,000 tokens,
+with space reserved for the query and request formatting). Jev scores every
+candidate again for the query. Each question includes the candidate's path
+and a bounded structural description, allowing the prompt to promote files
+omitted from the general document. Final output uses the original source and
+the prompt scores, under your requested output budget. Jev does not generate
+summaries; `--llm` optionally enables the existing text-summary backend for
+final output.
+
+Scores are cached outside the project in `~/.catenator/jev/`. General ratings
+are stored per relative file path with a **16-character SHA-256 prefix** of
+the contents that were rated. Existing files keep their general rating when
+edited; only paths missing from the cache are automatically scored. Adding a
+file asks Jev only about the new file, with project source as context. Removing
+or excluding a file needs no API call; its rating remains available if the
+path returns. Previously unseen renamed paths are new candidates.
+Scoring instructions and backend settings identify separate general caches.
+
+The short hash records which contents were rated; it does not force a new
+general judgment after routine edits. Use `--refresh-scores` to reassess every
+file, for example after a change of architectural role. Final output always
+uses current source. Prompt caches track current contents, paths, and query,
+so edits can refresh prompt scores while retaining general ratings. Repeating
+a query on unchanged inputs requires no API requests; a different query also
+reuses the general ratings. Watch mode retains the Jev options and keeps the
+previous output if scoring fails.
+
+Configuration precedence is process environment, target-project `.env`,
+then `~/.env`, without changing the process environment. `TYPESAFE_URL`
+defaults to `https://api.typesafe.ai/v1/systemone`, and `TYPESAFE_MODEL`
+defaults to the pinned `jev-1.13.0`. Set `CATENATOR_JEV_INPUT_PRICE` to change
+the estimated USD price per million input tokens.
+
+### Costs and inspecting scores
+
+Each fresh pass prints request count, actual API-reported input tokens, and
+estimated USD cost to stderr. The context document remains on stdout. Cache
+hits report no new API cost. Failed requests are not retried automatically.
+Only successfully validated responses contribute to the usage report;
+provider billing may include a request whose response could not be read.
+
+At Jev 1.13's published **$0.042 per million input tokens**, with output
+tokens free, these are example costs across all batches of a pass:
+
+| Billed input tokens | Estimated USD cost |
+| ---: | ---: |
+| 10,000 | $0.000420 |
+| 30,000 | $0.001260 |
+| 100,000 | $0.004200 |
+| 1,000,000 | $0.042000 |
+
+A cold general-plus-query run uses both passes. For example, 30,000 billed
+tokens per pass would total $0.00252; another query with cached general
+scores would cost $0.00126. Actual costs include question text and shared
+context repeated across batches. These estimates cover Jev only; `--llm`
+uses its separately priced summary backend. See [TypeSafe's model pricing](https://docs.typesafe.ai/models).
+
+The Python API exposes both raw per-file answers (including confidence and
+probabilities) and per-pass usage:
+
+```python
+cat = Catenator('/path/to/project')
+context = cat.catenate(use_jev=True, prompt='Explain authentication', token_limit=6000)
+print(cat.last_jev_scores['general'])
+print(cat.last_jev_scores['prompt'])
+print(cat.last_jev_report)
+```
 
 ## Development
 

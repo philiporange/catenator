@@ -4,3 +4,5 @@ watchdog==2.1.2
 pyyaml==6.0.1
 openai
 tomli>=2.0
+requests
+python-dotenv

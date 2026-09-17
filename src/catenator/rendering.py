@@ -3,8 +3,9 @@
 The renderer works from a single discovery snapshot. It reserves room for a
 bounded overview, tree, and coverage report, then gives each main directory an
 outline before upgrading important files. Token costs are cached per section;
-only the final assembled document needs an exact aggregate check. Source is
-never executed, and AI summaries are requested only with explicit opt-in.
+only the final assembled document needs an exact aggregate check. Optional Jev
+scores select ignored, summarized, or verbatim files and prioritize their
+expansion. Source is never executed, and AI summaries require explicit opt-in.
 """
 
 import re
@@ -93,7 +94,12 @@ def _outline(path, summary, budget, count):
 
 
 def render_project(
-    cat, files, overrides=None, token_limit=None, use_llm=False
+    cat,
+    files,
+    overrides=None,
+    token_limit=None,
+    use_llm=False,
+    file_scores=None,
 ):
     """Build one output document and record exact inclusion counts on *cat*."""
     overrides = overrides or {}
@@ -111,7 +117,17 @@ def render_project(
             records.append((path, absolute, content))
             labels[path] = label
 
-    ranked = summarizer.rank_files_by_importance(cat.directory, records)
+    if file_scores is None:
+        ranked = summarizer.rank_files_by_importance(cat.directory, records)
+    else:
+        ranked = sorted(
+            [
+                (*record, file_scores[record[0]])
+                for record in records
+                if file_scores[record[0]] >= 0.5
+            ],
+            key=lambda record: (-record[3], record[0]),
+        )
     title = f"### {cat.title}\n\n"
     overview_lines = (
         build_project_overview(records) if cat.include_overview else []
@@ -150,6 +166,19 @@ def render_project(
         path: _file_block(path, content, labels[path])
         for path, _, content, _ in ranked
     }
+    if file_scores is not None:
+        for path, absolute, content, score in ranked:
+            if score >= 1.5 or path in overrides:
+                continue
+            summary = (
+                summarizer.summarize_file(
+                    cat.directory, path, absolute, content, use_llm=True
+                )
+                if use_llm
+                else summarizer.extract_signatures(content, path)
+            )
+            full_blocks[path] = _file_block(path, summary, "summary")
+            labels[path] = "summary"
     if token_limit is None:
         selected.update(
             {
@@ -235,7 +264,8 @@ def render_project(
     else:
         summaries = {}
         initial_budget = max(65, min(180, available // max(1, len(records))))
-        for path, absolute, content, _score in _coverage_order(ranked):
+        order = _coverage_order(ranked) if file_scores is None else ranked
+        for path, absolute, content, _score in order:
             if available <= 0:
                 break
             full = full_blocks[path]
