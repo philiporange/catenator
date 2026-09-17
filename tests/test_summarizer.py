@@ -1,46 +1,99 @@
-"""Tests for OpenAI-compatible LLM summarizer configuration."""
+"""Tests for LLM summarizer configuration, defaults, and client integration.
+
+This module tests gateway model and endpoint defaults, environment variable
+precedence for generic and dedicated overrides, target project .env loading,
+and client invocation with fallback behavior.
+"""
 
 from src.catenator import summarizer
 
 
+def _isolate_env(monkeypatch):
+    for key in (
+        "CATENATOR_SUMMARIZER_MODEL",
+        "CATENATOR_SUMMARIZER_API_KEY",
+        "CATENATOR_SUMMARIZER_BASE_URL",
+        "LLM_API_KEY",
+        "LLM_BASE_URL",
+        "OPENAI_API_KEY",
+        "OPENAI_BASE_URL",
+        "DEEPSEEK_API_KEY",
+        "DEEPSEEK_BASE_URL",
+    ):
+        monkeypatch.delenv(key, raising=False)
+
+
 def test_get_llm_settings_reads_environment(monkeypatch):
-    monkeypatch.setenv("CATENATOR_SUMMARIZER_MODEL", "deepseek-v4-flash")
-    monkeypatch.setenv("CATENATOR_SUMMARIZER_API_KEY", "test-key")
-    monkeypatch.setenv(
-        "CATENATOR_SUMMARIZER_BASE_URL", "https://api.deepseek.com"
+    _isolate_env(monkeypatch)
+
+    # Gateway defaults with no environment configured
+    assert summarizer.get_llm_settings() == (
+        "muse-code/muse-spark-1.3",
+        None,
+        "https://llm.ph1l.uk/v1",
     )
 
+    # Generic environment variable fallback
+    monkeypatch.setenv("LLM_API_KEY", "generic-key")
+    monkeypatch.setenv("LLM_BASE_URL", "https://llm.example.com/v1")
     assert summarizer.get_llm_settings() == (
-        "deepseek-v4-flash",
-        "test-key",
-        "https://api.deepseek.com",
+        "muse-code/muse-spark-1.3",
+        "generic-key",
+        "https://llm.example.com/v1",
     )
+
+    # Dedicated overrides take precedence over generic variables
+    monkeypatch.setenv("CATENATOR_SUMMARIZER_MODEL", "custom-model")
+    monkeypatch.setenv("CATENATOR_SUMMARIZER_API_KEY", "dedicated-key")
+    monkeypatch.setenv(
+        "CATENATOR_SUMMARIZER_BASE_URL", "https://dedicated.example.com/v1"
+    )
+    assert summarizer.get_llm_settings() == (
+        "custom-model",
+        "dedicated-key",
+        "https://dedicated.example.com/v1",
+    )
+
+    # Vendor keys are ignored when generic LLM_API_KEY is unset
+    monkeypatch.delenv("CATENATOR_SUMMARIZER_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "vendor-openai-key")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "vendor-deepseek-key")
+    _, api_key, _ = summarizer.get_llm_settings()
+    assert api_key is None
 
 
 def test_get_llm_settings_loads_project_env(monkeypatch, tmp_path):
-    monkeypatch.delenv("CATENATOR_SUMMARIZER_MODEL", raising=False)
-    monkeypatch.delenv("CATENATOR_SUMMARIZER_API_KEY", raising=False)
-    monkeypatch.delenv("CATENATOR_SUMMARIZER_BASE_URL", raising=False)
-    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
-    monkeypatch.delenv("DEEPSEEK_BASE_URL", raising=False)
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+    _isolate_env(monkeypatch)
 
+    # Generic settings in project .env
     env_path = tmp_path / ".env"
     env_path.write_text(
-        "CATENATOR_SUMMARIZER_MODEL=deepseek-v4-flash\n"
-        "CATENATOR_SUMMARIZER_API_KEY=test-key\n"
-        "CATENATOR_SUMMARIZER_BASE_URL=https://api.deepseek.com\n"
+        "LLM_API_KEY=project-generic-key\n"
+        "LLM_BASE_URL=https://project-gw.example.com/v1\n"
+    )
+    assert summarizer.get_llm_settings(str(tmp_path)) == (
+        "muse-code/muse-spark-1.3",
+        "project-generic-key",
+        "https://project-gw.example.com/v1",
     )
 
+    # Dedicated overrides in project .env take precedence
+    env_path.write_text(
+        "CATENATOR_SUMMARIZER_MODEL=override-model\n"
+        "CATENATOR_SUMMARIZER_API_KEY=override-key\n"
+        "CATENATOR_SUMMARIZER_BASE_URL=https://override.example.com/v1\n"
+        "LLM_API_KEY=fallback-key\n"
+    )
     assert summarizer.get_llm_settings(str(tmp_path)) == (
-        "deepseek-v4-flash",
-        "test-key",
-        "https://api.deepseek.com",
+        "override-model",
+        "override-key",
+        "https://override.example.com/v1",
     )
 
 
 def test_summarize_file_uses_openai_client(monkeypatch, tmp_path):
+    _isolate_env(monkeypatch)
     captured = {}
 
     class FakeMessage:
@@ -72,11 +125,9 @@ def test_summarize_file_uses_openai_client(monkeypatch, tmp_path):
     monkeypatch.setattr(
         summarizer, "create_openai_client", fake_create_openai_client
     )
-    monkeypatch.setenv("CATENATOR_SUMMARIZER_MODEL", "deepseek-v4-flash")
-    monkeypatch.setenv("CATENATOR_SUMMARIZER_API_KEY", "test-key")
-    monkeypatch.setenv(
-        "CATENATOR_SUMMARIZER_BASE_URL", "https://api.deepseek.com"
-    )
+
+    # Test generic key with default model and gateway base URL
+    monkeypatch.setenv("LLM_API_KEY", "generic-key")
 
     source_path = tmp_path / "module.py"
     source_path.write_text("def hello():\n    return 'world'\n")
@@ -90,11 +141,29 @@ def test_summarize_file_uses_openai_client(monkeypatch, tmp_path):
     )
 
     assert summary == "AI summary"
-    assert captured["api_key"] == "test-key"
-    assert captured["base_url"] == "https://api.deepseek.com"
-    assert captured["request"]["model"] == "deepseek-v4-flash"
+    assert captured["api_key"] == "generic-key"
+    assert captured["base_url"] == "https://llm.ph1l.uk/v1"
+    assert captured["request"]["model"] == "muse-code/muse-spark-1.3"
     assert captured["request"]["temperature"] == 0
+    assert captured["request"]["max_tokens"] == 2048
     assert "module.py" in captured["request"]["messages"][0]["content"]
+
+    # Key selection: dedicated override takes precedence over generic key
+    monkeypatch.setenv("CATENATOR_SUMMARIZER_API_KEY", "dedicated-key")
+    monkeypatch.setattr(summarizer, "SUMMARY_CACHE_DIR", tmp_path / "cache2")
+
+    summary2 = summarizer.summarize_file(
+        str(tmp_path),
+        "module.py",
+        str(source_path),
+        source_path.read_text(),
+        use_llm=True,
+    )
+
+    assert summary2 == "AI summary"
+    assert captured["api_key"] == "dedicated-key"
+    assert captured["base_url"] == "https://llm.ph1l.uk/v1"
+    assert captured["request"]["model"] == "muse-code/muse-spark-1.3"
 
 
 def test_python_structure_preserves_multiline_decorated_signatures():

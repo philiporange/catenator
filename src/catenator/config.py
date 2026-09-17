@@ -1,10 +1,11 @@
-"""Configuration settings and environment loading for Jev integration.
+"""Configuration settings and defaults for Catenator services and summarization.
 
-This module defines configuration constants and the immutable JevSettings dataclass
-representing Typesafe Jev API connection parameters and pricing. It also provides
-the get_jev_settings function, which merges configuration values across user home
-(~/.env), project-specific (<project>/.env), and explicit process environments
-(os.environ) without mutating process state.
+This module defines configuration constants for AI summarization and Jev
+integration, along with the immutable JevSettings dataclass representing Typesafe
+Jev API connection parameters and pricing. It also provides the get_jev_settings
+function, which merges configuration values across user home (~/.env),
+project-specific (<project>/.env), and explicit process environments (os.environ)
+without mutating process state.
 """
 
 from dataclasses import dataclass, field
@@ -14,6 +15,10 @@ from pathlib import Path
 from typing import Optional, Union
 
 import dotenv
+
+DEFAULT_LLM_MODEL: str = "muse-code/muse-spark-1.3"
+DEFAULT_LLM_BASE_URL: str = "https://llm.ph1l.uk/v1"
+DEFAULT_LLM_MAX_TOKENS: int = 2048
 
 JEV_STATE_TOKEN_LIMIT: int = 28000
 JEV_REQUEST_TOKEN_LIMIT: int = 60000

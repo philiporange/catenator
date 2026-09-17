@@ -1,5 +1,4 @@
-"""
-Deterministic file importance ranking and structural summarization.
+"""Deterministic file importance ranking and structural summarization.
 
 When a project exceeds the token limit, this module:
 1. Ranks files by importance using fast heuristics (entry points, tests, etc.)
@@ -11,10 +10,14 @@ Summaries are generated lazily, only when needed to fit within the token
 limit.
 By default, extracts bounded declarations, imports, documentation outlines,
 and configuration keys instead of copying arbitrary file prefixes. With --llm,
-uses the OpenAI Python client for richer summaries. The
-target project's .env is loaded before each LLM summary so
-CATENATOR_SUMMARIZER_MODEL, CATENATOR_SUMMARIZER_API_KEY, and
-CATENATOR_SUMMARIZER_BASE_URL can configure the default backend.
+uses the OpenAI Python client for richer summaries defaulting to
+muse-code/muse-spark-1.3 on the gateway endpoint (https://llm.ph1l.uk/v1). The
+target project's .env is loaded before each LLM summary. API credentials and
+endpoints can be configured via generic LLM_API_KEY and LLM_BASE_URL environment
+variables, with dedicated CATENATOR_SUMMARIZER_MODEL,
+CATENATOR_SUMMARIZER_API_KEY, and CATENATOR_SUMMARIZER_BASE_URL overrides taking
+precedence. Requests reserve tokens for model reasoning while asking for a
+summary under 200 words.
 """
 
 import ast
@@ -26,17 +29,19 @@ import re
 from pathlib import Path
 from typing import Optional
 
+from .config import (
+    DEFAULT_LLM_BASE_URL,
+    DEFAULT_LLM_MAX_TOKENS,
+    DEFAULT_LLM_MODEL,
+)
+
 SUMMARY_CACHE_DIR = Path.home() / ".catenator" / "summaries"
 IMPORTANCE_CACHE_FILENAME = ".importance_cache.json"
-DEFAULT_LLM_MODEL = "deepseek-v4-flash"
-DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 LLM_MODEL_ENV = "CATENATOR_SUMMARIZER_MODEL"
 LLM_API_KEY_ENV = "CATENATOR_SUMMARIZER_API_KEY"
 LLM_BASE_URL_ENV = "CATENATOR_SUMMARIZER_BASE_URL"
-OPENAI_API_KEY_ENV = "OPENAI_API_KEY"
-OPENAI_BASE_URL_ENV = "OPENAI_BASE_URL"
-DEEPSEEK_API_KEY_ENV = "DEEPSEEK_API_KEY"
-DEEPSEEK_BASE_URL_ENV = "DEEPSEEK_BASE_URL"
+GENERIC_LLM_API_KEY_ENV = "LLM_API_KEY"
+GENERIC_LLM_BASE_URL_ENV = "LLM_BASE_URL"
 STRUCTURAL_CACHE_CONTEXT = "structural:v2"
 
 
@@ -413,12 +418,6 @@ def get_env_value(*env_names: str) -> Optional[str]:
     return None
 
 
-def is_deepseek_model(model_name: str) -> bool:
-    """Check whether a model name should use DeepSeek defaults."""
-    model_lower = model_name.lower()
-    return model_lower.startswith("deepseek") or "deepseek/" in model_lower
-
-
 def get_llm_settings(
     project_path: Optional[str] = None,
 ) -> tuple[str, Optional[str], Optional[str]]:
@@ -426,24 +425,14 @@ def get_llm_settings(
     if project_path:
         load_project_env(project_path)
 
-    model = os.getenv(LLM_MODEL_ENV, DEFAULT_LLM_MODEL).strip()
+    model = os.getenv(LLM_MODEL_ENV, "").strip()
     model = model or DEFAULT_LLM_MODEL
 
-    if is_deepseek_model(model):
-        api_key = get_env_value(
-            LLM_API_KEY_ENV, DEEPSEEK_API_KEY_ENV, OPENAI_API_KEY_ENV
-        )
-        base_url = get_env_value(
-            LLM_BASE_URL_ENV, DEEPSEEK_BASE_URL_ENV, OPENAI_BASE_URL_ENV
-        )
-        base_url = base_url or DEFAULT_DEEPSEEK_BASE_URL
-    else:
-        api_key = get_env_value(
-            LLM_API_KEY_ENV, OPENAI_API_KEY_ENV, DEEPSEEK_API_KEY_ENV
-        )
-        base_url = get_env_value(
-            LLM_BASE_URL_ENV, OPENAI_BASE_URL_ENV, DEEPSEEK_BASE_URL_ENV
-        )
+    api_key = get_env_value(LLM_API_KEY_ENV, GENERIC_LLM_API_KEY_ENV)
+    base_url = (
+        get_env_value(LLM_BASE_URL_ENV, GENERIC_LLM_BASE_URL_ENV)
+        or DEFAULT_LLM_BASE_URL
+    )
 
     return model, api_key, base_url
 
@@ -470,7 +459,7 @@ def summarize_with_openai(
     api_key: str,
     base_url: Optional[str],
 ) -> Optional[str]:
-    """Generate an LLM summary with the OpenAI Python client."""
+    """Generate a short summary with room for model reasoning before the answer."""
     prompt = f"""Summarize this source file concisely for a developer who needs
 to understand the codebase.
 Focus on its purpose, key functions/classes, dependencies, and project role.
@@ -488,7 +477,7 @@ Respond with ONLY the summary, no preamble."""
         model=model_name,
         messages=[{"role": "user", "content": prompt}],
         temperature=0,
-        max_tokens=300,
+        max_tokens=DEFAULT_LLM_MAX_TOKENS,
     )
     if not response.choices:
         return None

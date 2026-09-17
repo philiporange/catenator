@@ -211,6 +211,14 @@ backend remains available with the `summarize` extra and `--llm`:
 catenator /path/to/project --token-limit 10000 --llm
 ```
 
+By default, `--llm` uses `muse-code/muse-spark-1.3` through
+`https://llm.ph1l.uk/v1`. Set `LLM_API_KEY` in the target project's `.env` or
+in your environment; `LLM_BASE_URL` is optional. Existing
+`CATENATOR_SUMMARIZER_MODEL`, `CATENATOR_SUMMARIZER_API_KEY`, and
+`CATENATOR_SUMMARIZER_BASE_URL` overrides take precedence. Cached summaries are
+keyed by endpoint and model, so old summaries are naturally regenerated for
+the new backend and model.
+
 Files are labeled `(summary)` or `(outline)` when reduced. The automatic CLI
 extracts structure from its in-memory source snapshot; optional AI file
 summaries are cached in `~/.catenator/summaries/`.
