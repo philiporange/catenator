@@ -1,13 +1,13 @@
 """Score project files with Jev, then optionally rerank them for a query.
 
-General scoring sends every eligible file's full contents, batching source
-with shared project context when it exceeds Jev's input window. Large files
-are split without dropping characters and retain their highest part score.
-Query scoring uses a generous general-score rendering and a structural
-description of every candidate. General ratings persist by path with a short
-hash of the rated contents; only new paths are scored until explicitly
-refreshed. Query caches track current source contents. Each pass reports fresh
-input-token usage and its estimated dollar cost.
+Scoring uses bounded outlines with docstrings by default, adding the query
+directly to that context for task ratings. Optional full-source scoring batches
+all file contents and uses a generous general-score rendering for queries.
+Large inputs are split without dropping characters and keep their highest
+part score. General ratings persist by path with a short hash of the actual
+source; only new paths are scored until explicitly refreshed. Input modes have
+separate caches, and query caches track current source contents. Each pass
+reports its input mode, fresh token usage, and estimated dollar cost.
 """
 
 import copy
@@ -45,7 +45,7 @@ def _json(value):
     )
 
 
-def _question(path, content, prompt=False):
+def _question(path, content, prompt=False, full_source=False):
     goal = (
         "answering or carrying out the query in state"
         if prompt
@@ -62,27 +62,36 @@ def _question(path, content, prompt=False):
     )
     if prompt:
         instructions += (
-            " Judge relevance to the query independently of general importance. "
-            "A candidate absent from the general document may still be essential. "
+            " Judge relevance to the query independently of general importance."
+        )
+    if prompt and full_source:
+        instructions += (
+            " A candidate absent from the general document may still be essential. "
             "Candidate structure:\n" + extract_signatures(content, path)[:1600]
         )
     return {"type": "score", "instructions": instructions, "criteria": LEVELS}
 
 
-def _general_states(cat, files):
-    """Pack complete source, splitting oversized files at character boundaries."""
+def _general_states(cat, files, query=None, full_source=True):
+    """Pack scoring evidence with query space reserved in every source batch."""
     entries = [
-        {"path": path, "content": content, "start_character": 0}
+        {"path": path, "content": content,
+         **({"start_character": 0} if full_source else {})}
         for path, _, content in files
     ]
     state = {"project": cat.title, "source_files": entries}
+    if query is not None:
+        state["query"] = query
     if cat.count_tokens(_json(state)) <= JEV_STATE_TOKEN_LIMIT:
         return [state]
 
     context = render_project(copy.copy(cat), files, token_limit=2000)
 
     def make_state(items):
-        return {"project_context": context, "source_files": items}
+        state = {"project_context": context, "source_files": items}
+        if query is not None:
+            state["query"] = query
+        return state
 
     def fits(items):
         return (
@@ -97,7 +106,7 @@ def _general_states(cat, files):
             part = {
                 **entry,
                 "content": content[offset:],
-                "start_character": offset,
+                **({"start_character": offset} if full_source else {}),
             }
             if not fits([part]):
                 low, high = 0, len(content) - offset
@@ -132,14 +141,14 @@ def _general_states(cat, files):
     return states
 
 
-def _requests(cat, states, files, model, prompt=False):
+def _requests(cat, states, files, model, prompt=False, full_source=False):
     """Batch questions as well as source, counting their full serialized input."""
     by_path = {path: content for path, _, content in files}
     requests = []
     for state in states:
         paths = (
             list(by_path)
-            if prompt
+            if prompt and full_source
             else list(
                 dict.fromkeys(
                     entry["path"]
@@ -151,7 +160,7 @@ def _requests(cat, states, files, model, prompt=False):
         questions, targets = {}, {}
         for index, path in enumerate(paths):
             question_id = f"file_{index}"
-            question = _question(path, by_path[path], prompt)
+            question = _question(path, by_path[path], prompt, full_source)
 
             def cost(values):
                 return cat.count_tokens(
@@ -253,9 +262,12 @@ def _run_pass(
     source_hash=None,
     use_cache=True,
     cached_files=0,
+    full_source=False,
 ):
+    input_mode = "full" if full_source else "outlines"
+    cache_stage = stage if full_source else f"{stage}-outlines"
     path = _cache_path(
-        cat.directory, client.settings, stage, requests, source_hash
+        cat.directory, client.settings, cache_stage, requests, source_hash
     )
     cached = (
         None
@@ -264,6 +276,7 @@ def _run_pass(
     )
     report = {
         "stage": stage,
+        "input_mode": input_mode,
         "cache_hit": cached is not None or not requests,
         "cached_files": len(cached) if cached is not None else cached_files,
         "scored_files": 0,
@@ -275,7 +288,8 @@ def _run_pass(
     cat.last_jev_report.append(report)
     if cached is not None or not requests:
         print(
-            f"Jev {stage}: cached scores for {report['cached_files']} files; no API cost.",
+            f"Jev {stage} ({input_mode}): cached scores for "
+            f"{report['cached_files']} files; no API cost.",
             file=sys.stderr,
         )
         return cached if cached is not None else {}
@@ -302,7 +316,8 @@ def _run_pass(
             / 1_000_000
         )
         print(
-            f"Jev {stage}: {report['cached_files']} cached, {len(scores)} scored; "
+            f"Jev {stage} ({input_mode}): {report['cached_files']} cached, "
+            f"{len(scores)} scored; "
             f"{report['requests']} requests, "
             f"{report['input_tokens']:,} input tokens, "
             f"estimated ${report['estimated_cost_usd']:.6f} "
@@ -314,12 +329,12 @@ def _run_pass(
     return scores
 
 
-def _general_ratings(cat, client, files, refresh):
-    """Reuse ratings by path, retaining a 16-hex hash of the rated contents."""
+def _general_ratings(cat, client, files, scoring_files, refresh, full_source):
+    """Reuse each input mode's ratings by path, with 16-hex source hashes."""
     path = _cache_path(
         cat.directory,
         client.settings,
-        "general-ratings",
+        "general-ratings" if full_source else "general-ratings-outlines",
         _question("", ""),
         None,
     )
@@ -355,7 +370,11 @@ def _general_ratings(cat, client, files, refresh):
             missing.append(record)
     requests = (
         _requests(
-            cat, _general_states(cat, files), missing, client.settings.model
+            cat,
+            _general_states(cat, scoring_files, full_source=full_source),
+            missing,
+            client.settings.model,
+            full_source=full_source,
         )
         if missing
         else []
@@ -369,6 +388,7 @@ def _general_ratings(cat, client, files, refresh):
         refresh,
         use_cache=False,
         cached_files=len(reused),
+        full_source=full_source,
     )
     if missing:
         entries = {
@@ -382,20 +402,22 @@ def _general_ratings(cat, client, files, refresh):
     return {**reused, **fresh}
 
 
-def score_project(cat, files, prompt=None, refresh=False):
-    """Return 0–2 inclusion scores and retain per-pass answers and fresh usage."""
+def score_project(cat, files, prompt=None, refresh=False, full_source=False):
+    """Score outlines with docstrings or full source, retaining answers and usage."""
     if not files:
         return {}
     files = sorted(files)
     settings = get_jev_settings(cat.directory)
     client = JevClient(settings)
     try:
-        return _score_with_client(cat, files, client, prompt, refresh)
+        return _score_with_client(
+            cat, files, client, prompt, refresh, full_source
+        )
     finally:
         client.session.close()
 
 
-def _score_with_client(cat, files, client, prompt, refresh):
+def _score_with_client(cat, files, client, prompt, refresh, full_source):
     settings = client.settings
     if (
         prompt is not None
@@ -405,10 +427,18 @@ def _score_with_client(cat, files, client, prompt, refresh):
             "The Jev query is too large; shorten it to leave room for project context."
         )
 
-    general = _general_ratings(cat, client, files, refresh)
+    scoring_files = (
+        files if full_source else [
+            (path, absolute, extract_signatures(content, path))
+            for path, absolute, content in files
+        ]
+    )
+    general = _general_ratings(
+        cat, client, files, scoring_files, refresh, full_source
+    )
     cat.last_jev_scores["general"] = general
     scores = general
-    if prompt is not None:
+    if prompt is not None and full_source:
         # Leave room for the query, candidate descriptions, and serialization.
         budget = JEV_STATE_TOKEN_LIMIT - cat.count_tokens(prompt) - 1000
         while True:
@@ -430,14 +460,24 @@ def _score_with_client(cat, files, client, prompt, refresh):
                     "The Jev query leaves no room for project context."
                 )
         prompt_requests = _requests(
-            cat, [state], files, settings.model, prompt=True
+            cat, [state], files, settings.model, prompt=True, full_source=True
         )
+    elif prompt is not None:
+        prompt_requests = _requests(
+            cat,
+            _general_states(cat, scoring_files, query=prompt, full_source=False),
+            scoring_files,
+            settings.model,
+            prompt=True,
+        )
+    if prompt is not None:
         # The source snapshot is part of this key even for generally ignored files.
         context_key = hashlib.sha256(
             _json([(path, content) for path, _, content in files]).encode()
         ).hexdigest()
         scores = _run_pass(
-            cat, client, "prompt", prompt_requests, files, refresh, context_key
+            cat, client, "prompt", prompt_requests, files, refresh, context_key,
+            full_source=full_source,
         )
         cat.last_jev_scores["prompt"] = scores
     return {path: answer["score"] for path, answer in scores.items()}

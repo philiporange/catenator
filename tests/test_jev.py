@@ -1,4 +1,4 @@
-"""Verify Jev coverage, caching, budgets, and implicit activation from prompts.
+"""Verify outline and full-source Jev inputs, caching, budgets, and activation.
 
 An in-memory scorer returns controlled per-file answers while retaining each
 request for inspection. Tests exercise real discovery and rendering without
@@ -81,7 +81,8 @@ def catenator(project):
     )
 
 
-def test_scores_control_inclusion_and_strict_output_budgets(project):
+@pytest.mark.parametrize("full_source", [False, True])
+def test_scores_control_inclusion_and_strict_output_budgets(project, full_source):
     write(project, "main.py", 'def main():\n    return "VERBATIM_BODY"\n', 1.9)
     write(
         project,
@@ -96,7 +97,7 @@ def test_scores_control_inclusion_and_strict_output_budgets(project):
         0.1,
     )
     cat = catenator(project)
-    output = cat.catenate(use_jev=True)
+    output = cat.catenate(use_jev=True, jev_full_source=full_source)
     assert "VERBATIM_BODY" in output
     assert "# support.py (summary)" in output
     assert "HIDDEN_IMPLEMENTATION" not in output
@@ -114,11 +115,20 @@ def test_scores_control_inclusion_and_strict_output_budgets(project):
         entry["path"]: entry["content"]
         for entry in project.calls[0]["state"]["source_files"]
     }
-    assert sent == {
-        path: (project.root / path).read_text() for path in project.general
-    }
+    assert set(sent) == set(project.general)
+    if full_source:
+        assert sent == {
+            path: (project.root / path).read_text() for path in project.general
+        }
+    else:
+        assert "def main():" in sent["main.py"]
+        assert "VERBATIM_BODY" not in json.dumps(project.calls)
+        assert "HIDDEN_IMPLEMENTATION" not in json.dumps(project.calls)
+        assert "UNRELATED_BODY" not in json.dumps(project.calls)
     for limit in (1, 100, 250):
-        limited = cat.catenate(use_jev=True, token_limit=limit)
+        limited = cat.catenate(
+            use_jev=True, token_limit=limit, jev_full_source=full_source
+        )
         assert cat.count_tokens(limited) <= limit
         assert limited.count("```") % 2 == 0
     assert len(project.calls) == 1
@@ -144,7 +154,7 @@ def test_source_batches_preserve_large_unicode_files_and_use_highest_score(
         2.0 if state["source_files"][0]["start_character"] else 0.0
     )
     cat = catenator(project)
-    output = cat.catenate(use_jev=True)
+    output = cat.catenate(jev_full_source=True)
     assert len(project.calls) > 1
     parts = [
         entry
@@ -200,7 +210,8 @@ def test_question_batches_fit_complete_requests_and_score_every_file(
         )
 
 
-def test_prompt_promotes_ignored_files_and_reuses_general_cache(project):
+@pytest.mark.parametrize("full_source", [False, True])
+def test_prompt_promotes_ignored_files_and_reuses_general_cache(project, full_source):
     write(project, "core.py", 'def core():\n    return "CORE_BODY"\n')
     write(
         project,
@@ -211,20 +222,32 @@ def test_prompt_promotes_ignored_files_and_reuses_general_cache(project):
     query = "Explain the rare feature"
     project.queries[query] = {"core.py": 0.0, "rare.py": 2.0}
     cat = catenator(project)
-    output = cat.catenate(use_jev=True, prompt=query, token_limit=1000)
+    output = cat.catenate(
+        use_jev=True, prompt=query, token_limit=1000, jev_full_source=full_source
+    )
     assert "RARE_BODY" in output and "CORE_BODY" not in output
     assert "query" not in project.calls[0]["state"]
     assert project.calls[1]["state"]["query"] == query
-    assert (
-        "# rare.py" not in project.calls[1]["state"]["general_project_context"]
-    )
+    if full_source:
+        assert (
+            "# rare.py" not in project.calls[1]["state"]["general_project_context"]
+        )
+    else:
+        assert "general_project_context" not in project.calls[1]["state"]
+        assert {e["path"] for e in project.calls[1]["state"]["source_files"]} == {
+            "core.py", "rare.py"
+        }
+        assert "CORE_BODY" not in json.dumps(project.calls)
+        assert "RARE_BODY" not in json.dumps(project.calls)
     assert len(project.calls[1]["questions"]) == 2
     for report in cat.last_jev_report:
         assert report["input_tokens"] == 1234
         assert report["estimated_cost_usd"] == pytest.approx(
             1234 * 0.042 / 1_000_000
         )
-    assert cat.catenate(use_jev=True, prompt=query, token_limit=1000) == output
+    assert cat.catenate(
+        use_jev=True, prompt=query, token_limit=1000, jev_full_source=full_source
+    ) == output
     assert len(project.calls) == 2
     assert all(
         report["cache_hit"]
@@ -232,7 +255,9 @@ def test_prompt_promotes_ignored_files_and_reuses_general_cache(project):
         and report["estimated_cost_usd"] == 0
         for report in cat.last_jev_report
     )
-    cat.catenate(use_jev=True, prompt="Explain the core")
+    cat.catenate(
+        use_jev=True, prompt="Explain the core", jev_full_source=full_source
+    )
     assert len(project.calls) == 3
     assert [report["cache_hit"] for report in cat.last_jev_report] == [
         True,
@@ -450,8 +475,9 @@ def test_catenate_rejects_invalid_jev_options_before_requests(project, kwargs):
     assert project.calls == []
 
 
+@pytest.mark.parametrize("full_source", [False, True])
 def test_watch_retains_prompt_and_preserves_output_on_failure(
-    project, monkeypatch, capsys
+    project, monkeypatch, capsys, full_source
 ):
     source = write(project, "main.py", 'def main():\n    return "original"\n')
     output = project.root / "context.md"
@@ -462,11 +488,15 @@ def test_watch_retains_prompt_and_preserves_output_on_failure(
         cooldown=0,
         token_limit=300,
         prompt="Explain main",
+        jev_full_source=full_source,
     )
     handler.update_output()
     original = output.read_text()
     assert cat.count_tokens(original) <= 300
     assert project.calls[-1]["state"]["query"] == "Explain main"
+    assert cat.last_jev_report[-1]["input_mode"] == (
+        "full" if full_source else "outlines"
+    )
     assert "context.md" not in json.dumps(project.calls)
     source.write_text('def main():\n    return "changed"\n')
 
@@ -477,3 +507,108 @@ def test_watch_retains_prompt_and_preserves_output_on_failure(
     handler.update_output()
     assert output.read_text() == original
     assert "Catenator update failed" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("prompt", [None, "Explain the service interface"])
+def test_outline_inputs_keep_module_class_and_method_docstrings(project, prompt):
+    write(project, "service.py", '''"""Module purpose retained."""
+class Service:
+    """Class purpose retained."""
+    def run(self, value: str) -> str:
+        """Method purpose retained."""
+        return "BODY_ONLY_SENTINEL" + value
+''')
+    cat = catenator(project)
+    output = cat.catenate(use_jev=True, prompt=prompt)
+    assert "BODY_ONLY_SENTINEL" in output
+    for call in project.calls:
+        payload = json.dumps(call)
+        assert "BODY_ONLY_SENTINEL" not in payload
+        for text in ("Module purpose retained.", "Class purpose retained.",
+                     "Method purpose retained.", "class Service:",
+                     "def run(self, value: str) -> str:"):
+            assert text in payload
+    assert all(r["input_mode"] == "outlines" for r in cat.last_jev_report)
+
+
+def test_outline_query_batches_reserve_space_and_never_include_bodies(project, monkeypatch):
+    monkeypatch.setattr(jev, "JEV_STATE_TOKEN_LIMIT", 3000)
+    monkeypatch.setattr(jev, "JEV_PAIR_TOKEN_LIMIT", 3500)
+    monkeypatch.setattr(jev, "JEV_REQUEST_TOKEN_LIMIT", 4500)
+    for i in range(12):
+        content = "\n\n".join(
+            f'def action_{i}_{j}(value: str) -> str:\n'
+            f'    """Preserve the documented purpose of action {i} {j}."""\n'
+            f'    return "BODY_ONLY_{i}_{j}"\n'
+            for j in range(15)
+        )
+        write(project, f"module_{i}.py", content)
+    query = "Explain these documented actions. " * 100
+    cat = catenator(project)
+    output = cat.catenate(prompt=query, token_limit=1000)
+    assert cat.count_tokens(output) <= 1000
+    query_calls = [c for c in project.calls if "query" in c["state"]]
+    assert len(query_calls) > 1
+    assert set(cat.last_jev_scores["prompt"]) == set(project.general)
+    for call in project.calls:
+        assert "BODY_ONLY_" not in json.dumps(call)
+        assert cat.count_tokens(jev._json(call["state"])) <= 3000
+        assert cat.count_tokens(jev._json(call)) <= 4500
+        for key, question in call["questions"].items():
+            pair = {**call, "questions": {key: question}}
+            assert cat.count_tokens(jev._json(pair)) <= 3500
+    assert all(c["state"]["query"] == query for c in query_calls)
+
+
+def test_input_modes_keep_separate_general_and_prompt_caches(project):
+    write(project, "main.py", 'def main():\n    return "SOURCE_BODY"\n')
+    cat = catenator(project)
+    query = "Explain main"
+    outlines = cat.catenate(prompt=query)
+    project.general["main.py"] = 0.0
+    full = cat.catenate(prompt=query, jev_full_source=True)
+    assert len(project.calls) == 4
+    assert "SOURCE_BODY" in outlines and "SOURCE_BODY" not in full
+    assert cat.catenate(prompt=query) == outlines
+    assert cat.catenate(prompt=query, jev_full_source=True) == full
+    assert len(project.calls) == 4
+    project.general["main.py"] = 2.0
+    cat.catenate(prompt=query, jev_full_source=True, refresh_scores=True)
+    assert len(project.calls) == 6
+    assert cat.catenate(prompt=query) == outlines
+    assert len(project.calls) == 6
+    assert all(r["cache_hit"] for r in cat.last_jev_report)
+
+
+def test_full_source_reuses_existing_general_cache_identity(project):
+    content = 'def main():\n    return "SOURCE_BODY"\n'
+    write(project, "main.py", content, score=0.0)
+    path = jev._cache_path(
+        project.root, JevSettings(api_key="test-key"), "general-ratings",
+        jev._question("", ""), None,
+    )
+    jev._save_scores(path, {"main.py": {
+        "hash": hashlib.sha256(content.encode()).hexdigest()[:16],
+        "answer": {"score": 2.0},
+    }}, field="files")
+    cat = catenator(project)
+    assert "SOURCE_BODY" in cat.catenate(jev_full_source=True)
+    assert project.calls == []
+    assert cat.last_jev_report[0]["cache_hit"]
+    assert cat.last_jev_report[0]["input_mode"] == "full"
+
+
+@pytest.mark.parametrize("prompt", [None, "Explain main"])
+def test_cli_full_source_implicitly_enables_jev_and_allows_refresh(project, monkeypatch, capsys, prompt):
+    content = 'def main():\n    return "SOURCE_BODY"\n'
+    write(project, "main.py", content)
+    args = ["catenator", str(project.root), "--jev-full-source", "--refresh-scores"]
+    if prompt is not None:
+        args.extend(["--prompt", prompt])
+    monkeypatch.setattr(sys, "argv", args)
+    main()
+    assert "SOURCE_BODY" in capsys.readouterr().out
+    assert project.calls[0]["state"]["source_files"][0]["content"] == content
+    assert len(project.calls) == (2 if prompt else 1)
+    if prompt:
+        assert "general_project_context" in project.calls[1]["state"]

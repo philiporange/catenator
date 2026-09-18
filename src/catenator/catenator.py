@@ -6,11 +6,13 @@ and manifests. Files are discovered once, in stable order, and ignored trees
 are pruned before descent. Budgeted output covers the main directories with
 outlines before expanding important files into structural summaries or full
 source. Whole sections, including the overview and tree, share a strict token
-budget. The optional --llm flag enables AI file summaries. --jev evaluates
-all selected source in batches to score inclusion, reuses general ratings for
-known file paths, and optionally reranks them for --prompt using general project
-context. Providing a non-empty --prompt automatically enables Jev scoring. API
-usage and estimated cost are reported separately from output.
+budget. The optional --llm flag enables AI file summaries. --jev scores
+bounded outlines with first-line Python docstrings in batches to rank
+inclusion, reuses general ratings for known file paths, and optionally reranks
+them for --prompt. --jev-full-source sends full source to Jev instead of
+outlines; a non-empty --prompt or full-source selection enables Jev scoring
+automatically. Final rendering always uses actual source. API usage and
+estimated cost are reported separately from output.
 
 Ignore handling: vendored/generated directories (node_modules, __pycache__,
 venv, .git, etc.) are always excluded, in every mode, at any depth. The
@@ -397,15 +399,20 @@ class Catenator:
         use_jev=False,
         prompt=None,
         refresh_scores=False,
+        jev_full_source=False,
     ):
         """Render source and a factual overview within an optional budget.
 
         Overrides map paths to replacement text or (text, label); None skips
         a file. Each call takes a fresh filesystem snapshot, including when
         used by the watcher. Budgeting never rereads source or calls AI unless
-        use_llm or use_jev is enabled (providing a non-empty prompt automatically
-        enables Jev scoring). Jev scores use this same snapshot; prompt scoring
-        follows a cached general scoring pass.
+        use_llm or Jev scoring is enabled (a non-empty prompt or
+        jev_full_source automatically enables Jev). By default Jev scores
+        bounded outlines with first-line Python docstrings; jev_full_source
+        sends full source instead. Jev scores use this same snapshot; prompt
+        scoring follows a cached general scoring pass. Final rendering always
+        uses actual source, reduced by structural or LLM summaries as space
+        permits.
         """
         from .rendering import render_project
 
@@ -414,6 +421,8 @@ class Catenator:
         if prompt is not None:
             if not prompt.strip():
                 raise ValueError("prompt requires non-empty text")
+            use_jev = True
+        if jev_full_source:
             use_jev = True
         if refresh_scores and not use_jev:
             raise ValueError("refresh_scores requires Jev mode or a prompt")
@@ -435,7 +444,11 @@ class Catenator:
                 if content is not None:
                     scoring_files.append((path, absolute, content))
             file_scores = score_project(
-                self, scoring_files, prompt=prompt, refresh=refresh_scores
+                self,
+                scoring_files,
+                prompt=prompt,
+                refresh=refresh_scores,
+                full_source=jev_full_source,
             )
         return render_project(
             self,
@@ -494,14 +507,18 @@ class CatenatorEventHandler(FileSystemEventHandler):
         use_llm=False,
         use_jev=False,
         prompt=None,
+        jev_full_source=False,
     ):
         self.catenator = catenator
         self.output_file = os.path.abspath(output_file)
         self.catenator.exclude_paths.add(self.output_file)
         self.token_limit = token_limit
         self.use_llm = use_llm
-        self.use_jev = use_jev or bool(prompt and prompt.strip())
+        self.use_jev = (
+            use_jev or bool(prompt and prompt.strip()) or jev_full_source
+        )
         self.prompt = prompt
+        self.jev_full_source = jev_full_source
         self.cooldown = cooldown
         self.last_update = 0
         self.update_timer = None
@@ -553,6 +570,7 @@ class CatenatorEventHandler(FileSystemEventHandler):
                 use_llm=self.use_llm,
                 use_jev=self.use_jev,
                 prompt=self.prompt,
+                jev_full_source=self.jev_full_source,
             )
         except (JevError, ValueError) as error:
             print(f"Catenator update failed: {error}", file=sys.stderr)
@@ -644,7 +662,12 @@ def main():
     parser.add_argument(
         "--jev",
         action="store_true",
-        help="Score file inclusion with Jev (requires TYPESAFE_API_KEY)",
+        help="Score file inclusion from outlines with docstrings (requires TYPESAFE_API_KEY)",
+    )
+    parser.add_argument(
+        "--jev-full-source",
+        action="store_true",
+        help="Send full source instead of outlines with docstrings; enables Jev",
     )
     parser.add_argument(
         "--prompt",
@@ -665,8 +688,10 @@ def main():
         if not args.prompt.strip():
             parser.error("--prompt requires non-empty text")
         args.jev = True
+    if args.jev_full_source:
+        args.jev = True
     if args.refresh_scores and not args.jev:
-        parser.error("--refresh-scores requires --jev or --prompt")
+        parser.error("--refresh-scores requires --jev, --prompt, or --jev-full-source")
 
     build_config = {}
     if args.build:
@@ -712,6 +737,7 @@ def main():
             use_jev=args.jev,
             prompt=args.prompt,
             refresh_scores=args.refresh_scores,
+            jev_full_source=args.jev_full_source,
         )
     except (JevError, ValueError) as error:
         parser.exit(1, f"catenator: {error}\n")
@@ -734,6 +760,7 @@ def main():
                 use_llm=args.llm,
                 use_jev=args.jev,
                 prompt=args.prompt,
+                jev_full_source=args.jev_full_source,
             )
             observer = Observer()
             observer.schedule(event_handler, args.directory, recursive=True)

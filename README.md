@@ -49,9 +49,10 @@ Options:
 - `--include-hidden`: Include hidden files and directories, subject to ignore rules
 - `--token-limit N`: Keep output under N tokens by summarizing least important files
 - `--llm`: Use AI for richer summaries when using --token-limit (requires openai module)
-- `--jev`: Use Jev to score whether each file should be verbatim, summarized, or ignored
+- `--jev`: Use Jev with outlines and docstrings to score whether each file should be verbatim, summarized, or ignored
+- `--jev-full-source`: Send full source to Jev instead of outlines; enables Jev automatically
 - `--prompt TEXT`: Rank files for an instruction or query; enables Jev automatically
-- `--refresh-scores`: Recompute Jev scores instead of using the cache (requires `--jev` or `--prompt`)
+- `--refresh-scores`: Recompute scores for the selected Jev input mode (requires `--jev`, `--prompt`, or `--jev-full-source`)
 
 Example:
 ```
@@ -233,13 +234,23 @@ pip install -e '.[jev]'
 catenator /path/to/project --jev --token-limit 12000
 catenator /path/to/project --token-limit 6000 \
   --prompt "Fix the parser's handling of escaped quotes"
+catenator /path/to/project --jev-full-source --token-limit 12000
+catenator /path/to/project --jev-full-source --token-limit 6000 \
+  --prompt "Fix the parser's handling of escaped quotes"
 ```
 
-The general pass sends every eligible file's full contents to Jev and asks a
-separate scoring question for each file. Files share request context, and
-questions are batched to avoid repeating the project for every file. This
-uses the same discovery snapshot and ignore rules as normal Catenator.
-Selected source is sent to the configured TypeSafe endpoint.
+By default, Jev receives each eligible file's path and bounded structural
+outline, including first-line Python module, class, and function docstrings.
+Outlines preserve signatures, imports, and selected constants; they are
+limited to 80 lines and 12,000 characters per file. Other formats use the
+existing lightweight extractors described above. Jev asks a separate scoring
+question for each file, sharing context and batching questions across files.
+The discovery snapshot and ignore rules are the same as normal Catenator.
+
+Use `--jev-full-source` to send every eligible file's full contents instead.
+It enables Jev automatically, so `--jev` is optional alongside it. The selected
+ranking input is sent to the configured TypeSafe endpoint; final rendering
+always uses the original source, regardless of the ranking input.
 
 Scores use three ordered levels: 0 means ignore, 1 means summarize, and 2
 means verbatim. Fractional scores below 0.5 omit the file body; scores from
@@ -248,39 +259,46 @@ allow full source. The overview and directory tree can still mention omitted
 files. `--token-limit` can further reduce or omit files to fit the output.
 Without a token limit, the score's inclusion decision still applies.
 
-For larger projects, source is packed into roughly 28,000-token states with
-a shared structural project overview. Individual files exceeding a state
-are split without dropping source characters; their highest part score
+For larger projects, scoring input is packed into roughly 28,000-token states
+with a shared overview built from that same input representation. A query's
+space is reserved in each outline batch before packing. Inputs exceeding a
+state are split without dropping characters; their highest part score
 determines inclusion. Every file is evaluated, but each judgment sees only
-its source batch plus shared project context. Request packing also budgets
+its batch plus shared project context. Request packing also budgets
 question text: up to 30,000 estimated tokens for state plus one question and
 60,000 for state plus all questions. These counts use `cl100k_base` and leave
 headroom for Jev's different tokenizer. API size errors are reported clearly.
 
-`--prompt` enables Jev automatically, so `--jev` is optional when a prompt
-is supplied. Catenator first obtains general scores, then builds a general
-Jev document with a high context budget (up to approximately 27,000 tokens,
-with space reserved for the query and request formatting). Jev scores every
-candidate again for the query. Each question includes the candidate's path
-and a bounded structural description, allowing the prompt to promote files
-omitted from the general document. Final output uses the original source and
-the prompt scores, under your requested output budget. Jev does not generate
-summaries; `--llm` optionally enables the existing text-summary backend for
-final output.
+`--prompt` enables Jev automatically. Catenator obtains or reuses general
+ratings, then scores all candidate outlines with docstrings directly against
+the query. Query ratings are independent of general importance, so a
+generally ignored file can still be selected for a specific task.
+
+With `--jev-full-source`, prompt scoring builds a general Jev source document
+with a high context budget (up to approximately 27,000 tokens, reserving
+space for the query and formatting). Each query question also includes a
+bounded structural description of its candidate, including candidates absent
+from the general document. Final output uses the original source and prompt
+scores under your requested output budget. Jev does not generate summaries;
+`--llm` optionally enables the text-summary backend for final output.
 
 Scores are cached outside the project in `~/.catenator/jev/`. General ratings
 are stored per relative file path with a **16-character SHA-256 prefix** of
 the contents that were rated. Existing files keep their general rating when
 edited; only paths missing from the cache are automatically scored. Adding a
-file asks Jev only about the new file, with project source as context. Removing
-or excluding a file needs no API call; its rating remains available if the
+file asks Jev only about the new file, with the selected project representation
+as context. Removing or excluding a file needs no API call; its rating remains available if the
 path returns. Previously unseen renamed paths are new candidates.
 Scoring instructions and backend settings identify separate general caches.
+Outlines and full source have separate general and prompt caches. Full-source
+mode reuses existing full-source caches; the default outline mode fills its
+own cache. Both modes record hashes of actual source, not hashes of outlines.
 
 The short hash records which contents were rated; it does not force a new
 general judgment after routine edits. Use `--refresh-scores` to reassess every
-file, for example after a change of architectural role. Final output always
-uses current source. Prompt caches track current contents, paths, and query,
+file in the selected input mode, for example after a change of architectural
+role. Final output always uses current source. Prompt caches track current
+contents, paths, and query,
 so edits can refresh prompt scores while retaining general ratings. Repeating
 a query on unchanged inputs requires no API requests; a different query also
 reuses the general ratings. Watch mode retains the Jev options and keeps the
@@ -294,8 +312,8 @@ the estimated USD price per million input tokens.
 
 ### Costs and inspecting scores
 
-Each fresh pass prints request count, actual API-reported input tokens, and
-estimated USD cost to stderr. The context document remains on stdout. Cache
+Each fresh pass prints its input mode, request count, actual API-reported input
+tokens, and estimated USD cost to stderr. The context document remains on stdout. Cache
 hits report no new API cost. Failed requests are not retried automatically.
 Only successfully validated responses contribute to the usage report;
 provider billing may include a request whose response could not be read.
@@ -325,9 +343,14 @@ context = cat.catenate(prompt='Explain authentication', token_limit=6000)
 print(cat.last_jev_scores['general'])
 print(cat.last_jev_scores['prompt'])
 print(cat.last_jev_report)
+
+# Use full source for ranking instead of outlines with docstrings.
+context = cat.catenate(
+    prompt='Explain authentication', token_limit=6000, jev_full_source=True,
+)
 ```
 
-See the [three-project Jev benchmark](docs/jev-benchmark-2026-09-18.md) for
+See the [Jev benchmark comparisons](docs/jev-benchmark-2026-09-18.md) for
 measured quality, costs, cache behavior, and failure cases.
 
 ## Development
