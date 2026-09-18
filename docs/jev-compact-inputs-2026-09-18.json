@@ -1,0 +1,1198 @@
+{
+  "date": "2026-09-18",
+  "method": {
+    "created_utc": "2026-09-18T00:43:09Z",
+    "commit": "5fe1e7c1cc13d38b55d0ed56aed1bb34f0855eed",
+    "variants": [
+      "tree",
+      "skeleton",
+      "skeleton_docs"
+    ],
+    "budgets": [
+      6000,
+      12000,
+      24000
+    ],
+    "snapshot_sha256": "f47d72e5508cbfb150c79949826ab03e5c7fe581467597f4e4d86418187bf471",
+    "cases_sha256": "90d3a2c3bdbdb09abc20267512c07845df4cfd84594eb76131eeb907d5ea7e6c",
+    "primary_metric": "Prompt evidence retention at 12000 tokens; tie break by lower standalone prompt input tokens",
+    "general_method": "Score compact evidence directly with the existing general inclusion rubric",
+    "prompt_method": "Score the same compact evidence plus the task query directly; no full-source general-document pass",
+    "output_method": "Unchanged rendering of original full files using the resulting scores and structural summaries",
+    "extractor_limits": [
+      "Existing bounded extractor: 80 lines / 12000 chars per file",
+      "Python docs retain first lines only",
+      "JavaScript outlines include selected declarations, including some variable assignments inside bodies",
+      "Rust and CSS lack a structural extractor; their names and generic type notices remain"
+    ],
+    "cost_policy": "Identical payloads share one response; input_tokens/estimated_cost_usd report standalone usage, billed fields report actual new requests",
+    "input_stats": [
+      {
+        "project": "archive_manager",
+        "variant": "tree",
+        "preparation_seconds": 1.2191012501716614e-05,
+        "evidence_tokens": 0,
+        "state_tokens": 407,
+        "file_count": 44,
+        "requests": 1
+      },
+      {
+        "project": "archive_manager",
+        "variant": "skeleton",
+        "preparation_seconds": 0.08881154283881187,
+        "evidence_tokens": 16524,
+        "state_tokens": 17860,
+        "file_count": 44,
+        "requests": 1
+      },
+      {
+        "project": "archive_manager",
+        "variant": "skeleton_docs",
+        "preparation_seconds": 0.08829743415117264,
+        "evidence_tokens": 21342,
+        "state_tokens": 24750,
+        "file_count": 44,
+        "requests": 1
+      },
+      {
+        "project": "bottom_audio_player",
+        "variant": "tree",
+        "preparation_seconds": 3.939494490623474e-06,
+        "evidence_tokens": 0,
+        "state_tokens": 59,
+        "file_count": 8,
+        "requests": 1
+      },
+      {
+        "project": "bottom_audio_player",
+        "variant": "skeleton",
+        "preparation_seconds": 0.0010841842740774155,
+        "evidence_tokens": 1182,
+        "state_tokens": 1336,
+        "file_count": 8,
+        "requests": 1
+      },
+      {
+        "project": "bottom_audio_player",
+        "variant": "skeleton_docs",
+        "preparation_seconds": 0.0010362807661294937,
+        "evidence_tokens": 1182,
+        "state_tokens": 1336,
+        "file_count": 8,
+        "requests": 1
+      },
+      {
+        "project": "bunny_cdn",
+        "variant": "tree",
+        "preparation_seconds": 2.780929207801819e-06,
+        "evidence_tokens": 0,
+        "state_tokens": 66,
+        "file_count": 9,
+        "requests": 1
+      },
+      {
+        "project": "bunny_cdn",
+        "variant": "skeleton",
+        "preparation_seconds": 0.005378697067499161,
+        "evidence_tokens": 2041,
+        "state_tokens": 2286,
+        "file_count": 9,
+        "requests": 1
+      },
+      {
+        "project": "bunny_cdn",
+        "variant": "skeleton_docs",
+        "preparation_seconds": 0.005377845838665962,
+        "evidence_tokens": 2068,
+        "state_tokens": 2323,
+        "file_count": 9,
+        "requests": 1
+      }
+    ]
+  },
+  "compact_evidence": [
+    {
+      "variant": "tree",
+      "stage": "general",
+      "budget": 6000,
+      "retained": 10,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 0,
+        "bottom_audio_player": 10,
+        "bunny_cdn": 0
+      }
+    },
+    {
+      "variant": "tree",
+      "stage": "general",
+      "budget": 12000,
+      "retained": 10,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 0,
+        "bottom_audio_player": 10,
+        "bunny_cdn": 0
+      }
+    },
+    {
+      "variant": "tree",
+      "stage": "general",
+      "budget": 24000,
+      "retained": 18,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 0,
+        "bottom_audio_player": 10,
+        "bunny_cdn": 8
+      }
+    },
+    {
+      "variant": "tree",
+      "stage": "prompt",
+      "budget": 6000,
+      "retained": 10,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 0,
+        "bottom_audio_player": 10,
+        "bunny_cdn": 0
+      }
+    },
+    {
+      "variant": "tree",
+      "stage": "prompt",
+      "budget": 12000,
+      "retained": 24,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 8,
+        "bottom_audio_player": 12,
+        "bunny_cdn": 4
+      }
+    },
+    {
+      "variant": "tree",
+      "stage": "prompt",
+      "budget": 24000,
+      "retained": 32,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 8,
+        "bottom_audio_player": 12,
+        "bunny_cdn": 12
+      }
+    },
+    {
+      "variant": "skeleton",
+      "stage": "general",
+      "budget": 6000,
+      "retained": 10,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 0,
+        "bottom_audio_player": 10,
+        "bunny_cdn": 0
+      }
+    },
+    {
+      "variant": "skeleton",
+      "stage": "general",
+      "budget": 12000,
+      "retained": 14,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 4,
+        "bottom_audio_player": 10,
+        "bunny_cdn": 0
+      }
+    },
+    {
+      "variant": "skeleton",
+      "stage": "general",
+      "budget": 24000,
+      "retained": 22,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 4,
+        "bottom_audio_player": 10,
+        "bunny_cdn": 8
+      }
+    },
+    {
+      "variant": "skeleton",
+      "stage": "prompt",
+      "budget": 6000,
+      "retained": 18,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 8,
+        "bottom_audio_player": 10,
+        "bunny_cdn": 0
+      }
+    },
+    {
+      "variant": "skeleton",
+      "stage": "prompt",
+      "budget": 12000,
+      "retained": 24,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 8,
+        "bottom_audio_player": 12,
+        "bunny_cdn": 4
+      }
+    },
+    {
+      "variant": "skeleton",
+      "stage": "prompt",
+      "budget": 24000,
+      "retained": 36,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 12,
+        "bottom_audio_player": 12,
+        "bunny_cdn": 12
+      }
+    },
+    {
+      "variant": "skeleton_docs",
+      "stage": "general",
+      "budget": 6000,
+      "retained": 10,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 0,
+        "bottom_audio_player": 10,
+        "bunny_cdn": 0
+      }
+    },
+    {
+      "variant": "skeleton_docs",
+      "stage": "general",
+      "budget": 12000,
+      "retained": 10,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 0,
+        "bottom_audio_player": 10,
+        "bunny_cdn": 0
+      }
+    },
+    {
+      "variant": "skeleton_docs",
+      "stage": "general",
+      "budget": 24000,
+      "retained": 18,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 0,
+        "bottom_audio_player": 10,
+        "bunny_cdn": 8
+      }
+    },
+    {
+      "variant": "skeleton_docs",
+      "stage": "prompt",
+      "budget": 6000,
+      "retained": 18,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 8,
+        "bottom_audio_player": 10,
+        "bunny_cdn": 0
+      }
+    },
+    {
+      "variant": "skeleton_docs",
+      "stage": "prompt",
+      "budget": 12000,
+      "retained": 24,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 8,
+        "bottom_audio_player": 12,
+        "bunny_cdn": 4
+      }
+    },
+    {
+      "variant": "skeleton_docs",
+      "stage": "prompt",
+      "budget": 24000,
+      "retained": 36,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 12,
+        "bottom_audio_player": 12,
+        "bunny_cdn": 12
+      }
+    }
+  ],
+  "prior_full_source": [
+    {
+      "mode": "general",
+      "stage": "general",
+      "budget": 6000,
+      "retained": 10,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 0,
+        "bottom_audio_player": 10,
+        "bunny_cdn": 0
+      }
+    },
+    {
+      "mode": "general",
+      "stage": "general",
+      "budget": 12000,
+      "retained": 10,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 0,
+        "bottom_audio_player": 10,
+        "bunny_cdn": 0
+      }
+    },
+    {
+      "mode": "general",
+      "stage": "general",
+      "budget": 24000,
+      "retained": 18,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 0,
+        "bottom_audio_player": 10,
+        "bunny_cdn": 8
+      }
+    },
+    {
+      "mode": "prompt",
+      "stage": "prompt",
+      "budget": 6000,
+      "retained": 18,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 8,
+        "bottom_audio_player": 10,
+        "bunny_cdn": 0
+      }
+    },
+    {
+      "mode": "prompt",
+      "stage": "prompt",
+      "budget": 12000,
+      "retained": 24,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 8,
+        "bottom_audio_player": 12,
+        "bunny_cdn": 4
+      }
+    },
+    {
+      "mode": "prompt",
+      "stage": "prompt",
+      "budget": 24000,
+      "retained": 36,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 12,
+        "bottom_audio_player": 12,
+        "bunny_cdn": 12
+      }
+    }
+  ],
+  "ordinary_baseline": [
+    {
+      "mode": "baseline",
+      "budget": 6000,
+      "retained": 3,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 0,
+        "bottom_audio_player": 3,
+        "bunny_cdn": 0
+      }
+    },
+    {
+      "mode": "baseline",
+      "budget": 12000,
+      "retained": 16,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 0,
+        "bottom_audio_player": 12,
+        "bunny_cdn": 4
+      }
+    },
+    {
+      "mode": "baseline",
+      "budget": 24000,
+      "retained": 28,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 4,
+        "bottom_audio_player": 12,
+        "bunny_cdn": 12
+      }
+    }
+  ],
+  "paired_vs_full_source": [
+    {
+      "variant": "tree",
+      "stage": "general",
+      "budget": 6000,
+      "compact_retained": 10,
+      "full_source_retained": 10,
+      "total": 36,
+      "win_count": 0,
+      "loss_count": 0,
+      "tie_count": 36,
+      "net_wins": 0,
+      "wins": [],
+      "losses": []
+    },
+    {
+      "variant": "tree",
+      "stage": "general",
+      "budget": 12000,
+      "compact_retained": 10,
+      "full_source_retained": 10,
+      "total": 36,
+      "win_count": 0,
+      "loss_count": 0,
+      "tie_count": 36,
+      "net_wins": 0,
+      "wins": [],
+      "losses": []
+    },
+    {
+      "variant": "tree",
+      "stage": "general",
+      "budget": 24000,
+      "compact_retained": 18,
+      "full_source_retained": 18,
+      "total": 36,
+      "win_count": 0,
+      "loss_count": 0,
+      "tie_count": 36,
+      "net_wins": 0,
+      "wins": [],
+      "losses": []
+    },
+    {
+      "variant": "tree",
+      "stage": "prompt",
+      "budget": 6000,
+      "compact_retained": 10,
+      "full_source_retained": 18,
+      "total": 36,
+      "win_count": 0,
+      "loss_count": 8,
+      "tie_count": 28,
+      "net_wins": -8,
+      "wins": [],
+      "losses": [
+        "am_e1",
+        "am_e2",
+        "am_e3",
+        "am_e4",
+        "am_s1",
+        "am_s2",
+        "am_s3",
+        "am_s4"
+      ]
+    },
+    {
+      "variant": "tree",
+      "stage": "prompt",
+      "budget": 12000,
+      "compact_retained": 24,
+      "full_source_retained": 24,
+      "total": 36,
+      "win_count": 4,
+      "loss_count": 4,
+      "tie_count": 28,
+      "net_wins": 0,
+      "wins": [
+        "am_b1",
+        "am_b2",
+        "am_b3",
+        "am_b4"
+      ],
+      "losses": [
+        "am_e1",
+        "am_e2",
+        "am_e3",
+        "am_e4"
+      ]
+    },
+    {
+      "variant": "tree",
+      "stage": "prompt",
+      "budget": 24000,
+      "compact_retained": 32,
+      "full_source_retained": 36,
+      "total": 36,
+      "win_count": 0,
+      "loss_count": 4,
+      "tie_count": 32,
+      "net_wins": -4,
+      "wins": [],
+      "losses": [
+        "am_e1",
+        "am_e2",
+        "am_e3",
+        "am_e4"
+      ]
+    },
+    {
+      "variant": "skeleton",
+      "stage": "general",
+      "budget": 6000,
+      "compact_retained": 10,
+      "full_source_retained": 10,
+      "total": 36,
+      "win_count": 0,
+      "loss_count": 0,
+      "tie_count": 36,
+      "net_wins": 0,
+      "wins": [],
+      "losses": []
+    },
+    {
+      "variant": "skeleton",
+      "stage": "general",
+      "budget": 12000,
+      "compact_retained": 14,
+      "full_source_retained": 10,
+      "total": 36,
+      "win_count": 4,
+      "loss_count": 0,
+      "tie_count": 32,
+      "net_wins": 4,
+      "wins": [
+        "am_e1",
+        "am_e2",
+        "am_e3",
+        "am_e4"
+      ],
+      "losses": []
+    },
+    {
+      "variant": "skeleton",
+      "stage": "general",
+      "budget": 24000,
+      "compact_retained": 22,
+      "full_source_retained": 18,
+      "total": 36,
+      "win_count": 4,
+      "loss_count": 0,
+      "tie_count": 32,
+      "net_wins": 4,
+      "wins": [
+        "am_e1",
+        "am_e2",
+        "am_e3",
+        "am_e4"
+      ],
+      "losses": []
+    },
+    {
+      "variant": "skeleton",
+      "stage": "prompt",
+      "budget": 6000,
+      "compact_retained": 18,
+      "full_source_retained": 18,
+      "total": 36,
+      "win_count": 0,
+      "loss_count": 0,
+      "tie_count": 36,
+      "net_wins": 0,
+      "wins": [],
+      "losses": []
+    },
+    {
+      "variant": "skeleton",
+      "stage": "prompt",
+      "budget": 12000,
+      "compact_retained": 24,
+      "full_source_retained": 24,
+      "total": 36,
+      "win_count": 0,
+      "loss_count": 0,
+      "tie_count": 36,
+      "net_wins": 0,
+      "wins": [],
+      "losses": []
+    },
+    {
+      "variant": "skeleton",
+      "stage": "prompt",
+      "budget": 24000,
+      "compact_retained": 36,
+      "full_source_retained": 36,
+      "total": 36,
+      "win_count": 0,
+      "loss_count": 0,
+      "tie_count": 36,
+      "net_wins": 0,
+      "wins": [],
+      "losses": []
+    },
+    {
+      "variant": "skeleton_docs",
+      "stage": "general",
+      "budget": 6000,
+      "compact_retained": 10,
+      "full_source_retained": 10,
+      "total": 36,
+      "win_count": 0,
+      "loss_count": 0,
+      "tie_count": 36,
+      "net_wins": 0,
+      "wins": [],
+      "losses": []
+    },
+    {
+      "variant": "skeleton_docs",
+      "stage": "general",
+      "budget": 12000,
+      "compact_retained": 10,
+      "full_source_retained": 10,
+      "total": 36,
+      "win_count": 0,
+      "loss_count": 0,
+      "tie_count": 36,
+      "net_wins": 0,
+      "wins": [],
+      "losses": []
+    },
+    {
+      "variant": "skeleton_docs",
+      "stage": "general",
+      "budget": 24000,
+      "compact_retained": 18,
+      "full_source_retained": 18,
+      "total": 36,
+      "win_count": 0,
+      "loss_count": 0,
+      "tie_count": 36,
+      "net_wins": 0,
+      "wins": [],
+      "losses": []
+    },
+    {
+      "variant": "skeleton_docs",
+      "stage": "prompt",
+      "budget": 6000,
+      "compact_retained": 18,
+      "full_source_retained": 18,
+      "total": 36,
+      "win_count": 0,
+      "loss_count": 0,
+      "tie_count": 36,
+      "net_wins": 0,
+      "wins": [],
+      "losses": []
+    },
+    {
+      "variant": "skeleton_docs",
+      "stage": "prompt",
+      "budget": 12000,
+      "compact_retained": 24,
+      "full_source_retained": 24,
+      "total": 36,
+      "win_count": 0,
+      "loss_count": 0,
+      "tie_count": 36,
+      "net_wins": 0,
+      "wins": [],
+      "losses": []
+    },
+    {
+      "variant": "skeleton_docs",
+      "stage": "prompt",
+      "budget": 24000,
+      "compact_retained": 36,
+      "full_source_retained": 36,
+      "total": 36,
+      "win_count": 0,
+      "loss_count": 0,
+      "tie_count": 36,
+      "net_wins": 0,
+      "wins": [],
+      "losses": []
+    }
+  ],
+  "costs": {
+    "compact_by_variant_stage": {
+      "tree_general": {
+        "variant": "tree",
+        "stage": "general",
+        "passes": 3,
+        "requests": 3,
+        "reused_requests": 0,
+        "total_requests": 3,
+        "standalone_input_tokens": 13261,
+        "billed_input_tokens": 13261,
+        "standalone_cost_usd": 0.000556962,
+        "billed_cost_usd": 0.000556962
+      },
+      "tree_prompt": {
+        "variant": "tree",
+        "stage": "prompt",
+        "passes": 9,
+        "requests": 9,
+        "reused_requests": 0,
+        "total_requests": 9,
+        "standalone_input_tokens": 41914,
+        "billed_input_tokens": 41914,
+        "standalone_cost_usd": 0.001760388,
+        "billed_cost_usd": 0.001760388
+      },
+      "skeleton_general": {
+        "variant": "skeleton",
+        "stage": "general",
+        "passes": 3,
+        "requests": 3,
+        "reused_requests": 0,
+        "total_requests": 3,
+        "standalone_input_tokens": 36676,
+        "billed_input_tokens": 36676,
+        "standalone_cost_usd": 0.0015403920000000002,
+        "billed_cost_usd": 0.0015403920000000002
+      },
+      "skeleton_prompt": {
+        "variant": "skeleton",
+        "stage": "prompt",
+        "passes": 9,
+        "requests": 9,
+        "reused_requests": 0,
+        "total_requests": 9,
+        "standalone_input_tokens": 112159,
+        "billed_input_tokens": 112159,
+        "standalone_cost_usd": 0.004710678,
+        "billed_cost_usd": 0.004710678
+      },
+      "skeleton_docs_general": {
+        "variant": "skeleton_docs",
+        "stage": "general",
+        "passes": 3,
+        "requests": 2,
+        "reused_requests": 1,
+        "total_requests": 3,
+        "standalone_input_tokens": 41716,
+        "billed_input_tokens": 38372,
+        "standalone_cost_usd": 0.0017520720000000004,
+        "billed_cost_usd": 0.0016116240000000003
+      },
+      "skeleton_docs_prompt": {
+        "variant": "skeleton_docs",
+        "stage": "prompt",
+        "passes": 9,
+        "requests": 6,
+        "reused_requests": 3,
+        "total_requests": 9,
+        "standalone_input_tokens": 127279,
+        "billed_input_tokens": 116910,
+        "standalone_cost_usd": 0.005345718,
+        "billed_cost_usd": 0.00491022
+      }
+    },
+    "compact_by_variant": {
+      "tree": {
+        "variant": "tree",
+        "passes": 12,
+        "requests": 12,
+        "reused_requests": 0,
+        "total_requests": 12,
+        "standalone_input_tokens": 55175,
+        "billed_input_tokens": 55175,
+        "standalone_cost_usd": 0.00231735,
+        "billed_cost_usd": 0.00231735
+      },
+      "skeleton": {
+        "variant": "skeleton",
+        "passes": 12,
+        "requests": 12,
+        "reused_requests": 0,
+        "total_requests": 12,
+        "standalone_input_tokens": 148835,
+        "billed_input_tokens": 148835,
+        "standalone_cost_usd": 0.00625107,
+        "billed_cost_usd": 0.00625107
+      },
+      "skeleton_docs": {
+        "variant": "skeleton_docs",
+        "passes": 12,
+        "requests": 8,
+        "reused_requests": 4,
+        "total_requests": 12,
+        "standalone_input_tokens": 168995,
+        "billed_input_tokens": 155282,
+        "standalone_cost_usd": 0.0070977900000000005,
+        "billed_cost_usd": 0.006521844000000001
+      }
+    },
+    "full_source_by_stage": {
+      "general": {
+        "mode": "general",
+        "passes": 3,
+        "requests": 10,
+        "input_tokens": 207240,
+        "estimated_cost_usd": 0.00870408,
+        "source": "cold_usage from rank-results.json"
+      },
+      "prompt": {
+        "mode": "prompt",
+        "passes": 9,
+        "requests": 9,
+        "input_tokens": 242278,
+        "estimated_cost_usd": 0.010175676,
+        "source": "cold_usage from rank-results.json"
+      }
+    },
+    "full_source_total": {
+      "passes": 12,
+      "requests": 19,
+      "input_tokens": 449518,
+      "estimated_cost_usd": 0.018879755999999998
+    }
+  },
+  "prompt_latency_medians": [
+    {
+      "project": "archive_manager",
+      "full_source_prompt_median_seconds": 4.345242768526077,
+      "skeleton_prompt_median_seconds": 2.9600877426564693
+    },
+    {
+      "project": "bottom_audio_player",
+      "full_source_prompt_median_seconds": 0.9119000304490328,
+      "skeleton_prompt_median_seconds": 0.9188176952302456
+    },
+    {
+      "project": "bunny_cdn",
+      "full_source_prompt_median_seconds": 1.381244894117117,
+      "skeleton_prompt_median_seconds": 0.9269578978419304
+    }
+  ],
+  "qa": {
+    "model": "muse-code/muse-spark-1.3",
+    "logical_cases": 18,
+    "new_api_calls": 17,
+    "correct_out_of_36": {
+      "tree": 24,
+      "skeleton": 24
+    },
+    "full_source_prior_correct_out_of_36": 24,
+    "grades": [
+      {
+        "variant": "skeleton",
+        "project": "bottom_audio_player",
+        "task": "speed",
+        "accepted_ids": [
+          "ba_s1",
+          "ba_s2",
+          "ba_s3",
+          "ba_s4"
+        ],
+        "correct": 4,
+        "total": 4,
+        "new_api_request": false,
+        "context_sha256": "2039ba6e918f4f9df04da454eccc0291a02a85daa409dfdfe67f95805c32ddd7"
+      },
+      {
+        "variant": "skeleton",
+        "project": "archive_manager",
+        "task": "episodes",
+        "accepted_ids": [
+          "am_e1",
+          "am_e2",
+          "am_e3",
+          "am_e4"
+        ],
+        "correct": 4,
+        "total": 4,
+        "new_api_request": true,
+        "context_sha256": "bfa57856617deed96eb1f509e92ef49dcd1c391de27bedf15a4a8f3d7424135a"
+      },
+      {
+        "variant": "tree",
+        "project": "archive_manager",
+        "task": "subtitles",
+        "accepted_ids": [
+          "am_s1",
+          "am_s2",
+          "am_s3",
+          "am_s4"
+        ],
+        "correct": 4,
+        "total": 4,
+        "new_api_request": true,
+        "context_sha256": "6cf2a91d78c7385f4beaba68ced00e0394c3863b40ea62cd7dcfe54b3d5542bd"
+      },
+      {
+        "variant": "skeleton",
+        "project": "bunny_cdn",
+        "task": "uploads",
+        "accepted_ids": [],
+        "correct": 0,
+        "total": 4,
+        "new_api_request": true,
+        "context_sha256": "7c248ffbe4224af3f0bd65173bd92f9f10b4ef31b0169c23a9085cbf35c6a382"
+      },
+      {
+        "variant": "tree",
+        "project": "bottom_audio_player",
+        "task": "layout",
+        "accepted_ids": [
+          "ba_l1",
+          "ba_l2",
+          "ba_l3",
+          "ba_l4"
+        ],
+        "correct": 4,
+        "total": 4,
+        "new_api_request": true,
+        "context_sha256": "9db03558642cd182418f143d63007f40891cabb3f40843fc7cdc02bfb517c5cc"
+      },
+      {
+        "variant": "tree",
+        "project": "bunny_cdn",
+        "task": "ingestion",
+        "accepted_ids": [
+          "bc_i1",
+          "bc_i2",
+          "bc_i3",
+          "bc_i4"
+        ],
+        "correct": 4,
+        "total": 4,
+        "new_api_request": true,
+        "context_sha256": "9c09393e2d42d07155d4b9f3c79738f573d48f01753793896eba5be9309cce98"
+      },
+      {
+        "variant": "tree",
+        "project": "bottom_audio_player",
+        "task": "speed",
+        "accepted_ids": [
+          "ba_s1",
+          "ba_s2",
+          "ba_s3",
+          "ba_s4"
+        ],
+        "correct": 4,
+        "total": 4,
+        "new_api_request": true,
+        "context_sha256": "adac01d6880a37f6ff1e0132344f4794581ab1078542073984d60f54238245cd"
+      },
+      {
+        "variant": "tree",
+        "project": "bunny_cdn",
+        "task": "downloads",
+        "accepted_ids": [],
+        "correct": 0,
+        "total": 4,
+        "new_api_request": true,
+        "context_sha256": "cd90a57ba006b1fd157745a398b19e0414a9148e1bc6e7ecfb2a7cc891bc910d"
+      },
+      {
+        "variant": "tree",
+        "project": "bunny_cdn",
+        "task": "uploads",
+        "accepted_ids": [],
+        "correct": 0,
+        "total": 4,
+        "new_api_request": true,
+        "context_sha256": "0d3acae934592a8fafe62845a7b1a503a64cf0e9fc62291d6fd67ebdf89d3739"
+      },
+      {
+        "variant": "tree",
+        "project": "archive_manager",
+        "task": "book_metadata",
+        "accepted_ids": [
+          "am_b1",
+          "am_b2",
+          "am_b3",
+          "am_b4"
+        ],
+        "correct": 4,
+        "total": 4,
+        "new_api_request": true,
+        "context_sha256": "1f023531410e991e8af33ffa5b780cfa668eae2b3d58e2c0a25a460c7d5564fc"
+      },
+      {
+        "variant": "skeleton",
+        "project": "bottom_audio_player",
+        "task": "layout",
+        "accepted_ids": [
+          "ba_l1",
+          "ba_l2",
+          "ba_l3",
+          "ba_l4"
+        ],
+        "correct": 4,
+        "total": 4,
+        "new_api_request": true,
+        "context_sha256": "7946876f7d6d73e3552efae1f7145b01e3673c7bbb39094ed2361eced12a569b"
+      },
+      {
+        "variant": "skeleton",
+        "project": "archive_manager",
+        "task": "book_metadata",
+        "accepted_ids": [],
+        "correct": 0,
+        "total": 4,
+        "new_api_request": true,
+        "context_sha256": "73493226dfdba307bbc7c1abd0a4a20aeb87abfa2ae5dc5332148fe4252f3db4"
+      },
+      {
+        "variant": "skeleton",
+        "project": "bunny_cdn",
+        "task": "downloads",
+        "accepted_ids": [],
+        "correct": 0,
+        "total": 4,
+        "new_api_request": true,
+        "context_sha256": "07c388b9dbaa5911fe6479f1415bc74e739b059720e448549609c18775d5e359"
+      },
+      {
+        "variant": "tree",
+        "project": "bottom_audio_player",
+        "task": "downloads",
+        "accepted_ids": [
+          "ba_d1",
+          "ba_d2",
+          "ba_d3",
+          "ba_d4"
+        ],
+        "correct": 4,
+        "total": 4,
+        "new_api_request": true,
+        "context_sha256": "329793110253f6ca6151e81adb532be71fb13afc41a00fe243a87411ccd84b28"
+      },
+      {
+        "variant": "tree",
+        "project": "archive_manager",
+        "task": "episodes",
+        "accepted_ids": [],
+        "correct": 0,
+        "total": 4,
+        "new_api_request": true,
+        "context_sha256": "8c10c5a86be6ebd2e72b105aa77f9f7f80426da1d2292e105df7c96919e613eb"
+      },
+      {
+        "variant": "skeleton",
+        "project": "bunny_cdn",
+        "task": "ingestion",
+        "accepted_ids": [
+          "bc_i1",
+          "bc_i2",
+          "bc_i3",
+          "bc_i4"
+        ],
+        "correct": 4,
+        "total": 4,
+        "new_api_request": true,
+        "context_sha256": "33176b5494e877d6d0eea99c98308c614c5d2d0f39ff2fe3067b4754d957de50"
+      },
+      {
+        "variant": "skeleton",
+        "project": "archive_manager",
+        "task": "subtitles",
+        "accepted_ids": [
+          "am_s1",
+          "am_s2",
+          "am_s3",
+          "am_s4"
+        ],
+        "correct": 4,
+        "total": 4,
+        "new_api_request": true,
+        "context_sha256": "a83d7b0b6a130ff7da73aa215921c77bedc69fab6f64ade3f6472687ea6035e0"
+      },
+      {
+        "variant": "skeleton",
+        "project": "bottom_audio_player",
+        "task": "downloads",
+        "accepted_ids": [
+          "ba_d1",
+          "ba_d2",
+          "ba_d3",
+          "ba_d4"
+        ],
+        "correct": 4,
+        "total": 4,
+        "new_api_request": true,
+        "context_sha256": "2039ba6e918f4f9df04da454eccc0291a02a85daa409dfdfe67f95805c32ddd7"
+      }
+    ],
+    "grading": "Answers manually checked against the original frozen rubric; all accepted answers have supporting literal quotes.",
+    "new_input_tokens": 123167,
+    "new_output_tokens": 12347
+  },
+  "primary_screen_selection": {
+    "selected_variant": "tree",
+    "screening_rule": "Most prompted evidence at 12000 tokens; tie-break by least standalone prompt input tokens",
+    "screening_note": "Predeclared screening choice, not a held-out quality claim",
+    "selected_metrics": {
+      "variant": "tree",
+      "prompt_evidence_12000": 24,
+      "prompt_evidence_6000": 10,
+      "prompt_evidence_24000": 32,
+      "standalone_prompt_input_tokens": 41914,
+      "standalone_prompt_cost_usd": 0.001760388,
+      "billed_prompt_input_tokens": 41914,
+      "billed_prompt_cost_usd": 0.001760388
+    },
+    "candidates": {
+      "tree": {
+        "variant": "tree",
+        "prompt_evidence_12000": 24,
+        "prompt_evidence_6000": 10,
+        "prompt_evidence_24000": 32,
+        "standalone_prompt_input_tokens": 41914,
+        "standalone_prompt_cost_usd": 0.001760388,
+        "billed_prompt_input_tokens": 41914,
+        "billed_prompt_cost_usd": 0.001760388
+      },
+      "skeleton": {
+        "variant": "skeleton",
+        "prompt_evidence_12000": 24,
+        "prompt_evidence_6000": 18,
+        "prompt_evidence_24000": 36,
+        "standalone_prompt_input_tokens": 112159,
+        "standalone_prompt_cost_usd": 0.004710678,
+        "billed_prompt_input_tokens": 112159,
+        "billed_prompt_cost_usd": 0.004710678
+      },
+      "skeleton_docs": {
+        "variant": "skeleton_docs",
+        "prompt_evidence_12000": 24,
+        "prompt_evidence_6000": 18,
+        "prompt_evidence_24000": 36,
+        "standalone_prompt_input_tokens": 127279,
+        "standalone_prompt_cost_usd": 0.005345718,
+        "billed_prompt_input_tokens": 116910,
+        "billed_prompt_cost_usd": 0.00491022
+      }
+    }
+  },
+  "interpretation": {
+    "quick_win_candidate": "skeleton",
+    "reason": "No task-evidence losses versus full-source at any tested budget; four extra general evidence checks at 12k and 24k, lower cost.",
+    "tree_tradeoff": "The predeclared 12k-total/cost rule selects tree, but it exchanges episode facts for metadata facts and loses evidence at 6k and 24k.",
+    "limitations": "One screen on the original nine cases. Selection and confirmation use the same cases. Existing extractor lacks Rust/CSS structure and includes some JavaScript variable declarations. No production ranking changes."
+  },
+  "validation": {
+    "compact_passes": 36,
+    "compact_outputs": 108,
+    "all_tokens_within_budget": true,
+    "distinct_fact_ids_per_variant_stage_budget": 36,
+    "prior_passes": 12
+  },
+  "actual_jev_screen_cost_usd": 0.015090264,
+  "actual_jev_screen_requests": 32,
+  "local_raw_archive_at_run": "/tmp/catenator-jev-inputs-20260918"
+}

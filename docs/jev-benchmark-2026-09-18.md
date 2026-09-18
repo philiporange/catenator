@@ -215,12 +215,9 @@ successful code changes, variation between repeated fresh Jev ratings, or
 the quality of AI-generated summaries. Whole-project orientation may value
 information outside these task questions.
 
-Cheaper general-ranking inputs could contain only the project tree and
-filenames, or paths together with imports, class and function signatures,
-and docstrings. Jev can score either representation. These variants have
-not been measured here; the general pass in this benchmark received full
-eligible source in batches. Structural extraction quality, including the
-current gap for Rust, would be part of that comparison.
+The original comparison above used full eligible source in batches for
+general ranking. A follow-up screen of compact ranking inputs is reported
+below.
 
 An initial harness assertion failed because usage reports accumulated
 between direct scoring calls. The successful archive general ratings were
@@ -235,3 +232,78 @@ usage. Full local snapshots, rendered contexts, and raw QA receipts were
 saved under `/tmp/catenator-jev-comparison-20260918/`; that temporary archive
 is not part of the repository. The monitored run completed successfully
 with Bell job `a5faa16a3af7`.
+
+## Follow-up: compact ranking inputs
+
+The same frozen snapshots and 36 checks were used to screen three cheaper
+inputs at commit `5fe1e7c`: paths only, existing structural outlines without
+Python docstrings, and those outlines with docstrings. Final rendering still
+used the original source files and the same inclusion thresholds and budgets.
+
+General importance was scored directly from each compact representation.
+Task relevance was also scored directly from that representation plus the
+query, without first constructing a general Jev document containing source.
+Thus the prompt comparison tests a simpler scoring pipeline as well as a
+smaller input. The prior full-source measurements were reused.
+
+**Outlines without docstrings were the strongest quick-win candidate.**
+They matched every task-evidence check retained by full-source ranking at
+all three budgets, gained four general-evidence checks at 12,000 and 24,000
+tokens, and reduced combined estimated Jev cost by **66.9%**.
+
+| Ranking input | General evidence at 12k | Task evidence at 6k / 12k / 24k | Cost: three general + nine task passes |
+|---|---:|---:|---:|
+| Full source | 10/36 | 18 / 24 / 36 | $0.018880 |
+| Paths only | 10/36 | 10 / 24 / 32 | $0.002317 |
+| Outlines without docstrings | **14/36** | **18 / 24 / 36** | **$0.006251** |
+| Outlines with docstrings | 10/36 | 18 / 24 / 36 | $0.007098 |
+
+For outlines without docstrings, general-ranking input usage fell from
+207,240 to 36,676 tokens, an **82.3% reduction**. Task-ranking usage fell
+from 242,278 to 112,159 tokens, a **53.7% reduction**. The archive's general
+ranking fit all 44 file outlines in one request, compared with eight requests
+for its full source.
+
+Paths alone were cheaper still, but had meaningful regressions. At 12,000
+tokens they recovered four audiobook-metadata checks while losing four
+episode-parsing checks, so the equal total concealed a tradeoff. At 6,000
+they lost eight checks relative to full-source task ranking, and at 24,000
+they lost four. General path-only ranking matched the full-source general
+checks at all three budgets, though both remained worse than ordinary mode
+at the larger budgets.
+
+The predeclared screen selected by 12,000-token task total and then cost,
+which selected paths only. Inspection of the paired losses and the other
+budgets led to choosing outlines as the more promising implementation
+candidate. Both paths and outlines were checked with the same blind Muse
+QA protocol at 12,000 tokens: each scored **24/36**, matching the prior
+full-source task score. Paths answered a different set of questions;
+outlines answered the same set as full source. There were 17 new QA calls
+and one exact context/question reuse, with all responses completing normally.
+
+Median task-scoring times, including compact extraction and request
+preparation but excluding discovery and final rendering, were:
+
+| Project | Full source | Outlines without docstrings |
+|---|---:|---:|
+| `archive_manager` | 4.35 s | 2.96 s |
+| `bottom_audio_player` | 0.91 s | 0.92 s |
+| `bunny_cdn` | 1.38 s | 0.93 s |
+
+Docstrings added cost without improving the measured task results. This
+tests the current extractor's first-line Python docstrings, not exhaustive
+documentation. The extractor also retains some JavaScript variable
+declarations and lacks Rust/CSS structural support, so these are practical
+existing outlines rather than complete language-independent skeletons.
+
+The screen made 32 new Jev requests for an estimated **$0.015090264**.
+Four identical outline/docstring payloads for the audio player reused their
+responses. The comparison table charges each variant its standalone token
+usage, so reuse does not artificially lower the docstring option's cost.
+Muse QA costs are separate. All 108 compact outputs respected their budgets.
+
+This is a quick screen on the original cases, with no fresh-rating variance
+or held-out projects measured. Catenator's production ranking input has not
+been changed. [Compact-input results and usage](jev-compact-inputs-2026-09-18.json)
+are preserved alongside the original benchmark data; full local receipts
+remain under `/tmp/catenator-jev-inputs-20260918/`.
