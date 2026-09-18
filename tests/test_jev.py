@@ -1,4 +1,4 @@
-"""Verify Jev source coverage, prompt reranking, caching, budgets, and CLI use.
+"""Verify Jev coverage, caching, budgets, and implicit activation from prompts.
 
 An in-memory scorer returns controlled per-file answers while retaining each
 request for inspection. Tests exercise real discovery and rendering without
@@ -336,9 +336,93 @@ def test_changing_filters_retains_general_ratings(project):
     assert set(cat.last_jev_scores["general"]) == {"main.py", "guide.md"}
 
 
+def test_prompt_alone_triggers_both_stages_and_query_selection(project):
+    write(project, "core.py", 'def core():\n    return "CORE_BODY"\n')
+    write(
+        project,
+        "rare.py",
+        'def rare_feature():\n    return "RARE_BODY"\n',
+        0.0,
+    )
+    query = "Explain the rare feature"
+    project.queries[query] = {"core.py": 0.0, "rare.py": 2.0}
+    cat = catenator(project)
+    output = cat.catenate(prompt=query, token_limit=1000)
+    assert "RARE_BODY" in output and "CORE_BODY" not in output
+    assert len(project.calls) == 2
+    assert "query" not in project.calls[0]["state"]
+    assert project.calls[1]["state"]["query"] == query
+
+
+def test_cli_prompt_alone_and_refresh_accepted(project, monkeypatch, capsys):
+    write(project, "core.py", 'def core():\n    return "CORE_BODY"\n')
+    write(
+        project,
+        "rare.py",
+        'def rare_feature():\n    return "RARE_BODY"\n',
+        0.0,
+    )
+    query = "Explain the rare feature"
+    project.queries[query] = {"core.py": 0.0, "rare.py": 2.0}
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "catenator",
+            str(project.root),
+            "--prompt",
+            query,
+            "--token-limit",
+            "1000",
+        ],
+    )
+    main()
+    out = capsys.readouterr().out
+    assert "RARE_BODY" in out and "CORE_BODY" not in out
+    assert len(project.calls) == 2
+    assert project.calls[1]["state"]["query"] == query
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "catenator",
+            str(project.root),
+            "--prompt",
+            query,
+            "--refresh-scores",
+            "--token-limit",
+            "1000",
+        ],
+    )
+    main()
+    assert len(project.calls) == 4
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "catenator",
+            str(project.root),
+            "--jev",
+            "--prompt",
+            query,
+            "--token-limit",
+            "1000",
+        ],
+    )
+    main()
+    assert len(project.calls) == 4
+
+
 @pytest.mark.parametrize(
     "args",
-    [["--prompt", "hello"], ["--jev", "--prompt", "  "], ["--refresh-scores"]],
+    [
+        ["--prompt", ""],
+        ["--prompt", "  "],
+        ["--jev", "--prompt", "  "],
+        ["--refresh-scores"],
+    ],
 )
 def test_cli_rejects_invalid_jev_options_before_requests(
     project, monkeypatch, args
@@ -347,6 +431,22 @@ def test_cli_rejects_invalid_jev_options_before_requests(
     with pytest.raises(SystemExit) as error:
         main()
     assert error.value.code == 2
+    assert project.calls == []
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"prompt": ""},
+        {"prompt": "  "},
+        {"use_jev": True, "prompt": "  "},
+        {"refresh_scores": True},
+    ],
+)
+def test_catenate_rejects_invalid_jev_options_before_requests(project, kwargs):
+    cat = catenator(project)
+    with pytest.raises(ValueError):
+        cat.catenate(**kwargs)
     assert project.calls == []
 
 
@@ -361,7 +461,6 @@ def test_watch_retains_prompt_and_preserves_output_on_failure(
         str(output),
         cooldown=0,
         token_limit=300,
-        use_jev=True,
         prompt="Explain main",
     )
     handler.update_output()

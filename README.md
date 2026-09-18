@@ -50,8 +50,8 @@ Options:
 - `--token-limit N`: Keep output under N tokens by summarizing least important files
 - `--llm`: Use AI for richer summaries when using --token-limit (requires openai module)
 - `--jev`: Use Jev to score whether each file should be verbatim, summarized, or ignored
-- `--prompt TEXT`: Rerank Jev scores for an instruction or query (requires `--jev`)
-- `--refresh-scores`: Recompute Jev scores instead of using the cache (requires `--jev`)
+- `--prompt TEXT`: Rank files for an instruction or query; enables Jev automatically
+- `--refresh-scores`: Recompute Jev scores instead of using the cache (requires `--jev` or `--prompt`)
 
 Example:
 ```
@@ -231,7 +231,7 @@ Install token counting and set `TYPESAFE_API_KEY` in your environment,
 ```sh
 pip install -e '.[jev]'
 catenator /path/to/project --jev --token-limit 12000
-catenator /path/to/project --jev --token-limit 6000 \
+catenator /path/to/project --token-limit 6000 \
   --prompt "Fix the parser's handling of escaped quotes"
 ```
 
@@ -257,7 +257,8 @@ question text: up to 30,000 estimated tokens for state plus one question and
 60,000 for state plus all questions. These counts use `cl100k_base` and leave
 headroom for Jev's different tokenizer. API size errors are reported clearly.
 
-With `--prompt`, Catenator first obtains general scores, then builds a general
+`--prompt` enables Jev automatically, so `--jev` is optional when a prompt
+is supplied. Catenator first obtains general scores, then builds a general
 Jev document with a high context budget (up to approximately 27,000 tokens,
 with space reserved for the query and request formatting). Jev scores every
 candidate again for the query. Each question includes the candidate's path
@@ -320,11 +321,14 @@ probabilities) and per-pass usage:
 
 ```python
 cat = Catenator('/path/to/project')
-context = cat.catenate(use_jev=True, prompt='Explain authentication', token_limit=6000)
+context = cat.catenate(prompt='Explain authentication', token_limit=6000)
 print(cat.last_jev_scores['general'])
 print(cat.last_jev_scores['prompt'])
 print(cat.last_jev_report)
 ```
+
+See the [three-project Jev benchmark](docs/jev-benchmark-2026-09-18.md) for
+measured quality, costs, cache behavior, and failure cases.
 
 ## Development
 

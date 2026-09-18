@@ -1,0 +1,2349 @@
+{
+  "conclusion": "Neither general nor prompt Jev strictly dominates ordinary catenator on these cases; prompt Jev has higher aggregate evidence retention at all three budgets.",
+  "commit": "f7c5cd9d7eb2647d29dcd45d3bf9770e4ca289e3",
+  "projects": {
+    "archive_manager": {
+      "files": 44,
+      "source_tokens": 128269
+    },
+    "bottom_audio_player": {
+      "files": 8,
+      "source_tokens": 10342
+    },
+    "bunny_cdn": {
+      "files": 9,
+      "source_tokens": 21404
+    }
+  },
+  "method": "Frozen source snapshots, nine tasks, 36 facts validated before ranking, structural summaries in all modes, one fresh rating per project/task. Blind matched four-question Muse QA at 12k; full-source controls have twelve questions per project.",
+  "literal_evidence_retention": [
+    {
+      "budget": 6000,
+      "mode": "baseline",
+      "retained": 3,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 0,
+        "bottom_audio_player": 3,
+        "bunny_cdn": 0
+      }
+    },
+    {
+      "budget": 6000,
+      "mode": "general",
+      "retained": 10,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 0,
+        "bottom_audio_player": 10,
+        "bunny_cdn": 0
+      }
+    },
+    {
+      "budget": 6000,
+      "mode": "prompt",
+      "retained": 18,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 8,
+        "bottom_audio_player": 10,
+        "bunny_cdn": 0
+      }
+    },
+    {
+      "budget": 12000,
+      "mode": "baseline",
+      "retained": 16,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 0,
+        "bottom_audio_player": 12,
+        "bunny_cdn": 4
+      }
+    },
+    {
+      "budget": 12000,
+      "mode": "general",
+      "retained": 10,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 0,
+        "bottom_audio_player": 10,
+        "bunny_cdn": 0
+      }
+    },
+    {
+      "budget": 12000,
+      "mode": "prompt",
+      "retained": 24,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 8,
+        "bottom_audio_player": 12,
+        "bunny_cdn": 4
+      }
+    },
+    {
+      "budget": 24000,
+      "mode": "baseline",
+      "retained": 28,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 4,
+        "bottom_audio_player": 12,
+        "bunny_cdn": 12
+      }
+    },
+    {
+      "budget": 24000,
+      "mode": "general",
+      "retained": 18,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 0,
+        "bottom_audio_player": 10,
+        "bunny_cdn": 8
+      }
+    },
+    {
+      "budget": 24000,
+      "mode": "prompt",
+      "retained": 36,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 12,
+        "bottom_audio_player": 12,
+        "bunny_cdn": 12
+      }
+    }
+  ],
+  "paired_evidence_comparisons": [
+    {
+      "budget": 6000,
+      "mode": "general",
+      "wins": [
+        "ba_d1",
+        "ba_d2",
+        "ba_d3",
+        "ba_d4",
+        "ba_s1",
+        "ba_s2",
+        "ba_s3",
+        "ba_s4",
+        "ba_l4"
+      ],
+      "losses": [
+        "ba_l2",
+        "ba_l3"
+      ],
+      "ties": 25
+    },
+    {
+      "budget": 6000,
+      "mode": "prompt",
+      "wins": [
+        "am_e1",
+        "am_e2",
+        "am_e3",
+        "am_e4",
+        "am_s1",
+        "am_s2",
+        "am_s3",
+        "am_s4",
+        "ba_d1",
+        "ba_d2",
+        "ba_d3",
+        "ba_d4",
+        "ba_s1",
+        "ba_s2",
+        "ba_s3",
+        "ba_s4",
+        "ba_l4"
+      ],
+      "losses": [
+        "ba_l2",
+        "ba_l3"
+      ],
+      "ties": 17
+    },
+    {
+      "budget": 12000,
+      "mode": "general",
+      "wins": [],
+      "losses": [
+        "ba_l2",
+        "ba_l3",
+        "bc_i1",
+        "bc_i2",
+        "bc_i3",
+        "bc_i4"
+      ],
+      "ties": 30
+    },
+    {
+      "budget": 12000,
+      "mode": "prompt",
+      "wins": [
+        "am_e1",
+        "am_e2",
+        "am_e3",
+        "am_e4",
+        "am_s1",
+        "am_s2",
+        "am_s3",
+        "am_s4"
+      ],
+      "losses": [],
+      "ties": 28
+    },
+    {
+      "budget": 24000,
+      "mode": "general",
+      "wins": [],
+      "losses": [
+        "am_e1",
+        "am_e2",
+        "am_e3",
+        "am_e4",
+        "ba_l2",
+        "ba_l3",
+        "bc_i1",
+        "bc_i2",
+        "bc_i3",
+        "bc_i4"
+      ],
+      "ties": 26
+    },
+    {
+      "budget": 24000,
+      "mode": "prompt",
+      "wins": [
+        "am_s1",
+        "am_s2",
+        "am_s3",
+        "am_s4",
+        "am_b1",
+        "am_b2",
+        "am_b3",
+        "am_b4"
+      ],
+      "losses": [],
+      "ties": 28
+    }
+  ],
+  "qa_12000": [
+    {
+      "mode": "baseline",
+      "correct": 17,
+      "grounded_correct": 16,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 1,
+        "bottom_audio_player": 12,
+        "bunny_cdn": 4
+      }
+    },
+    {
+      "mode": "general",
+      "correct": 10,
+      "grounded_correct": 10,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 0,
+        "bottom_audio_player": 10,
+        "bunny_cdn": 0
+      }
+    },
+    {
+      "mode": "prompt",
+      "correct": 24,
+      "grounded_correct": 24,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 8,
+        "bottom_audio_player": 12,
+        "bunny_cdn": 4
+      }
+    },
+    {
+      "mode": "reference",
+      "correct": 36,
+      "grounded_correct": 36,
+      "total": 36,
+      "by_project_out_of_12": {
+        "archive_manager": 12,
+        "bottom_audio_player": 12,
+        "bunny_cdn": 12
+      }
+    }
+  ],
+  "jev_cost": {
+    "jev_model": "jev-1.13.0",
+    "input_tokens": 449518,
+    "requests": 19,
+    "price_usd_per_million_input_tokens": 0.042,
+    "estimated_usd": 0.018879756,
+    "warm_requests": 0,
+    "warm_cost_usd": 0,
+    "by_project": {
+      "archive_manager": {
+        "general": 0.007062972,
+        "prompt": 0.006432762
+      },
+      "bottom_audio_player": {
+        "general": 0.000570528,
+        "prompt": 0.001138326
+      },
+      "bunny_cdn": {
+        "general": 0.0010705800000000002,
+        "prompt": 0.002604588
+      }
+    }
+  },
+  "qa_usage": {
+    "model": "muse-code/muse-spark-1.3",
+    "calls": 30,
+    "input_tokens": 387599,
+    "output_tokens": 24827,
+    "cost_usd": null,
+    "cost_note": "Jev cost excludes Muse evaluation calls; gateway responses contain token usage but no monetary charge."
+  },
+  "validation": {
+    "all_outputs_within_budget": true,
+    "all_source_evidence_validated": true,
+    "all_warm_scores_and_12k_outputs_identical": true,
+    "changed_sources_since_snapshot": [],
+    "completed_contexts": 48,
+    "completed_ranking_passes": 12,
+    "successful_qa_calls": 30
+  },
+  "limitations": [
+    "Three selected projects and three hand-authored tasks each; no universal dominance claim",
+    "One fresh Jev rating per project/task, without measuring rating variance",
+    "Exact excerpt retention is a lower bound when summaries paraphrase evidence",
+    "QA measures comprehension, not successful code changes",
+    "One archive cold timing was lost in a harness assertion; usage was recovered from Bell logs and successful ratings reused without new requests."
+  ],
+  "date": "2026-09-18",
+  "questions": [
+    {
+      "project": "archive_manager",
+      "task": "episodes",
+      "prompt": "Fix and test season/episode parsing and ordering for local SS.EE filenames, including multi-episode files and detector fallback behavior.",
+      "facts": [
+        {
+          "id": "am_e1",
+          "question": "What season and episode value does parsing '03.19 - 03.20 - Holly Jolly Secrets.mp4' return?",
+          "expected": "Season 3, episode list [19, 20].",
+          "source_paths": [
+            "archive_manager/core/classifier.py",
+            "tests/test_classifier.py"
+          ]
+        },
+        {
+          "id": "am_e2",
+          "question": "When a season contains episode values 21, [19, 20], and 18, in what order does collect_tv_structure return them?",
+          "expected": "18, [19, 20], 21; the first episode in a list is its sort key.",
+          "source_paths": [
+            "archive_manager/core/classifier.py",
+            "tests/test_classifier.py"
+          ]
+        },
+        {
+          "id": "am_e3",
+          "question": "For a filename that does not match local dot notation, if detector.identify returns episode=[7, 8], what episode value does parse_season_episode return?",
+          "expected": "7; the detector's list is reduced to its first item.",
+          "source_paths": [
+            "archive_manager/core/classifier.py"
+          ]
+        },
+        {
+          "id": "am_e4",
+          "question": "For '03.19 - 04.20 - Title.mp4', does the dot parser include the second episode? What result is returned?",
+          "expected": "No; the changed season ends the scan, returning (3, 19).",
+          "source_paths": [
+            "archive_manager/core/classifier.py"
+          ]
+        }
+      ]
+    },
+    {
+      "project": "archive_manager",
+      "task": "subtitles",
+      "prompt": "Debug missing English subtitle downloads, archived subtitle paths, ffprobe failures, and default provider selection.",
+      "facts": [
+        {
+          "id": "am_s1",
+          "question": "For data/Movie/Film.mkv beneath data_root=data, what relative subtitle filename is placed under subtitles_dir?",
+          "expected": "Movie/Film.mkv.srt; retain the video extension and subdirectory.",
+          "source_paths": [
+            "archive_manager/completion/subtitles.py"
+          ]
+        },
+        {
+          "id": "am_s2",
+          "question": "Will an embedded stream tagged language='fra', title='English SDH' prevent an external English subtitle download? Why?",
+          "expected": "Yes; an English substring in the normalized title is sufficient even when the language tag is not English.",
+          "source_paths": [
+            "archive_manager/completion/subtitles.py"
+          ]
+        },
+        {
+          "id": "am_s3",
+          "question": "If ffprobe is missing or exits unsuccessfully, is the file considered to already have embedded English subtitles?",
+          "expected": "No; both cases return False, leaving it eligible for an external subtitle.",
+          "source_paths": [
+            "archive_manager/completion/subtitles.py"
+          ]
+        },
+        {
+          "id": "am_s4",
+          "question": "When no subtitle providers are explicitly configured, which providers are used?",
+          "expected": "podnapisi, tvsubtitles, gestdown.",
+          "source_paths": [
+            "archive_manager/completion/subtitles.py"
+          ]
+        }
+      ]
+    },
+    {
+      "project": "archive_manager",
+      "task": "book_metadata",
+      "prompt": "Maintain stable audiobook identities and metadata layout when multiple books share a directory, author tags are absent, or generated directory names collide.",
+      "facts": [
+        {
+          "id": "am_b1",
+          "question": "How is the media ID filename computed from a book key path? State the hash, length, encoding, and filename shape.",
+          "expected": "UTF-8 key path, SHA1 hexdigest first 8 characters, media.<hash>.id.",
+          "source_paths": [
+            "archive_manager/processors/audiobook_metadata.py"
+          ]
+        },
+        {
+          "id": "am_b2",
+          "question": "When two books have the same containing directory, which path identifies each book?",
+          "expected": "Its representative first audio file relative to data, rather than the shared directory.",
+          "source_paths": [
+            "archive_manager/processors/audiobook_metadata.py"
+          ]
+        },
+        {
+          "id": "am_b3",
+          "question": "What source value is written for a book with neither its own author nor a shared author, and what changes when a shared author is supplied?",
+          "expected": "local without an author, scanned with an author; own author takes precedence over shared author.",
+          "source_paths": [
+            "archive_manager/processors/audiobook_metadata.py"
+          ]
+        },
+        {
+          "id": "am_b4",
+          "question": "What length cap and collision suffix are applied to audiobook directory labels?",
+          "expected": "Sanitized base label capped at 150 characters and rstripped; collisions append (2), (3), etc.",
+          "source_paths": [
+            "archive_manager/processors/audiobook_metadata.py"
+          ]
+        }
+      ]
+    },
+    {
+      "project": "bottom_audio_player",
+      "task": "downloads",
+      "prompt": "Debug audio predownload caching, concurrent downloads, stale background completions, buffering progress, and network-failure fallback.",
+      "facts": [
+        {
+          "id": "ba_d1",
+          "question": "How does a second _downloadTrack call for a URL whose download is in progress avoid a duplicate fetch?",
+          "expected": "It awaits downloadingTracks[url], then reuses the cached blob.",
+          "source_paths": [
+            "bottom-audio-player.js"
+          ]
+        },
+        {
+          "id": "ba_d2",
+          "question": "What prevents a completed background download from replacing the source of a different track that is now playing?",
+          "expected": "Source assignment is guarded by trackIndex === this.index.",
+          "source_paths": [
+            "bottom-audio-player.js"
+          ]
+        },
+        {
+          "id": "ba_d3",
+          "question": "Under what conditions does the streaming download update the buffered progress indicator, and what total is used?",
+          "expected": "Only for the current track and a positive Content-Length; progress is received bytes divided by that total.",
+          "source_paths": [
+            "bottom-audio-player.js"
+          ]
+        },
+        {
+          "id": "ba_d4",
+          "question": "If fetching the audio blob fails, what source does the current track use?",
+          "expected": "The original URL is assigned directly for regular streaming, followed by load and speed restoration.",
+          "source_paths": [
+            "bottom-audio-player.js"
+          ]
+        }
+      ]
+    },
+    {
+      "project": "bottom_audio_player",
+      "task": "speed",
+      "prompt": "Fix playback speed persistence and restoration when tracks or media metadata change, including values outside the speed dropdown options.",
+      "facts": [
+        {
+          "id": "ba_s1",
+          "question": "What exact localStorage key persists playback speed?",
+          "expected": "bap-playback-speed.",
+          "source_paths": [
+            "bottom-audio-player.js"
+          ]
+        },
+        {
+          "id": "ba_s2",
+          "question": "Would saved speeds 0.4, 3, and 5 be restored even if absent from the configured dropdown?",
+          "expected": "Only 3; valid stored numbers range from 0.5 through 4 inclusive and need not appear in the options.",
+          "source_paths": [
+            "bottom-audio-player.js"
+          ]
+        },
+        {
+          "id": "ba_s3",
+          "question": "Which media event reapplies currentSpeed after loading a source's metadata?",
+          "expected": "loadedmetadata calls _applyCurrentSpeed.",
+          "source_paths": [
+            "bottom-audio-player.js"
+          ]
+        },
+        {
+          "id": "ba_s4",
+          "question": "When the speed control changes, how is its value converted and what fallback speed is used?",
+          "expected": "parseFloat(value) || 1; store in currentSpeed, assign audio.playbackRate, and persist its string value.",
+          "source_paths": [
+            "bottom-audio-player.js"
+          ]
+        }
+      ]
+    },
+    {
+      "project": "bottom_audio_player",
+      "task": "layout",
+      "prompt": "Adjust the player's initial collapsed/autoplay behavior and responsive mobile layout, including time visibility, playlist height, and keyboard track activation.",
+      "facts": [
+        {
+          "id": "ba_l1",
+          "question": "By default, does the player start collapsed and does it autoplay?",
+          "expected": "Collapsed true, autoplay false.",
+          "source_paths": [
+            "bottom-audio-player.js",
+            "README.md"
+          ]
+        },
+        {
+          "id": "ba_l2",
+          "question": "At what mobile width breakpoint is the time display hidden, and what selector is hidden?",
+          "expected": "max-width 520px; .bap__time has display: none.",
+          "source_paths": [
+            "bottom-audio-player.css"
+          ]
+        },
+        {
+          "id": "ba_l3",
+          "question": "What maximum height and scrolling behavior are used for the expanded playlist?",
+          "expected": "max-height 42vh with overflow: auto.",
+          "source_paths": [
+            "bottom-audio-player.css"
+          ]
+        },
+        {
+          "id": "ba_l4",
+          "question": "Which keys activate a focused playlist item, and does activation request playback?",
+          "expected": "Enter and Space; _load(index, true) selects and plays it.",
+          "source_paths": [
+            "bottom-audio-player.js"
+          ]
+        }
+      ]
+    },
+    {
+      "project": "bunny_cdn",
+      "task": "downloads",
+      "prompt": "Audit download approval validation, referer precedence, proxy-derived client IPs, and the order in which authorization, rate limits, and cost limits are applied.",
+      "facts": [
+        {
+          "id": "bc_d1",
+          "question": "If both the download request JSON and HTTP Referer header provide a referer, which wins?",
+          "expected": "The JSON request referer wins; the header is a fallback only when it is absent.",
+          "source_paths": [
+            "src/main.rs"
+          ]
+        },
+        {
+          "id": "bc_d2",
+          "question": "In what order are auth, path, referer, IP rate, client rate, and project cost checks performed for a download?",
+          "expected": "Auth, path validation, referer, IP rate, client rate, project cost.",
+          "source_paths": [
+            "src/main.rs"
+          ]
+        },
+        {
+          "id": "bc_d3",
+          "question": "With trusted proxy headers, what is the client-IP precedence? What happens when proxy trust is disabled?",
+          "expected": "First trimmed nonempty X-Forwarded-For entry, then trimmed X-Real-IP, then socket IP; disabled trust uses socket IP.",
+          "source_paths": [
+            "src/main.rs"
+          ]
+        },
+        {
+          "id": "bc_d4",
+          "question": "Is a download path '/media/a.m4b?x=1' valid? Is a '..' path segment accepted?",
+          "expected": "Neither; query strings/fragments and parent segments are rejected.",
+          "source_paths": [
+            "src/main.rs"
+          ]
+        }
+      ]
+    },
+    {
+      "project": "bunny_cdn",
+      "task": "uploads",
+      "prompt": "Debug upload storage reservations and oversized commits, presigning failures, and cost accounting when an upload approval is rejected.",
+      "facts": [
+        {
+          "id": "bc_u1",
+          "question": "What quantity is compared with the account's storage limit before reserving an upload?",
+          "expected": "used_bytes + reserved_bytes + requested size_bytes, with saturating addition; reject if greater than limit.",
+          "source_paths": [
+            "src/main.rs"
+          ]
+        },
+        {
+          "id": "bc_u2",
+          "question": "Does committing an upload larger than its reservation fail, or is it accepted? What flags and counters change?",
+          "expected": "Accepted; reserved bytes decrease by reserved size, used bytes increase by actual size, oversized and over_account_limit flags report excess.",
+          "source_paths": [
+            "src/main.rs"
+          ]
+        },
+        {
+          "id": "bc_u3",
+          "question": "If B2 presigning fails after storage has been reserved, what happens to the reservation and HTTP response?",
+          "expected": "The reservation is aborted and the response is 500 presign_failed.",
+          "source_paths": [
+            "src/main.rs"
+          ]
+        },
+        {
+          "id": "bc_u4",
+          "question": "Does upload approval charge egress based on size_bytes, and is cost spent before or after reserving storage?",
+          "expected": "It estimates cost with zero bytes (base request cost), spends before reserving storage, and does not refund on reservation failure.",
+          "source_paths": [
+            "src/main.rs"
+          ]
+        }
+      ]
+    },
+    {
+      "project": "bunny_cdn",
+      "task": "ingestion",
+      "prompt": "Make the analytics NDJSON ingester reliable for partial writes, malformed JSON, duplicate events, and log truncation without losing its persistent position.",
+      "facts": [
+        {
+          "id": "bc_i1",
+          "question": "What does the ingester do with a final log line that has no newline yet?",
+          "expected": "Seeks back to the line start and stops; the persisted offset stays before that partial line for the next run.",
+          "source_paths": [
+            "analytics/app.py"
+          ]
+        },
+        {
+          "id": "bc_i2",
+          "question": "Does malformed JSON on a complete line get retried forever, or skipped with an advanced offset?",
+          "expected": "Skipped with advanced offset: offset is updated after readline, before JSON decoding.",
+          "source_paths": [
+            "analytics/app.py"
+          ]
+        },
+        {
+          "id": "bc_i3",
+          "question": "Which key deduplicates ingested events, and what happens on a conflict?",
+          "expected": "request_id; ON CONFLICT (request_id) DO NOTHING.",
+          "source_paths": [
+            "analytics/app.py"
+          ]
+        },
+        {
+          "id": "bc_i4",
+          "question": "When the stored offset is beyond the current log size, where does ingestion restart?",
+          "expected": "Offset 0.",
+          "source_paths": [
+            "analytics/app.py"
+          ]
+        }
+      ]
+    }
+  ],
+  "source_hashes": {
+    "archive_manager": [
+      {
+        "path": "METADATA.json",
+        "sha256": "aa5868ceda7da6f7aa071eb5914a53d896be06de05dd02f6dc7d93886b1955ce",
+        "tokens": 884
+      },
+      {
+        "path": "README.md",
+        "sha256": "0aadf19d4847eb60045e85911a35b116cd133f7dd985940ee03c3c15a184246a",
+        "tokens": 2923
+      },
+      {
+        "path": "USAGE.md",
+        "sha256": "0236dca09d0d8e7ca6d717dce90cb7f76104581850b113ddd2c6031171452553",
+        "tokens": 9280
+      },
+      {
+        "path": "pyproject.toml",
+        "sha256": "97e2cc2c84aca5cd5121a78abaf595a75bce10b05ec693a7b51d85c8829a6dfe",
+        "tokens": 905
+      },
+      {
+        "path": "requirements.txt",
+        "sha256": "00ec991f277017456f676f0291177515cbf88fd8af2fdc5702fd5692e5d7089e",
+        "tokens": 115
+      },
+      {
+        "path": "test_basic.py",
+        "sha256": "0283668df915a43197a44ae2abb2580548e9377ecea947b36dedfb7ae100b8a2",
+        "tokens": 600
+      },
+      {
+        "path": "archive_manager/__init__.py",
+        "sha256": "77a229b38f5ff748e30bdee0748f876846aff20114d7e9b0a64ab725903361cd",
+        "tokens": 5246
+      },
+      {
+        "path": "archive_manager/cli.py",
+        "sha256": "9b34078243e5ea8d5f5b692306c1975fea7285748b15fb16f500bdf9d17f3864",
+        "tokens": 5648
+      },
+      {
+        "path": "archive_manager/config.py",
+        "sha256": "88ab7a002bdc19b2feb795a69ed50c15928fcaceffd4a6f8d55d1ee503035d51",
+        "tokens": 1143
+      },
+      {
+        "path": "archive_manager/server.py",
+        "sha256": "c5d6dac3e71e04231e0b28bf9eef36ac96ee6ace526d89a04cbece4b153e109d",
+        "tokens": 8263
+      },
+      {
+        "path": "archive_manager/completion/__init__.py",
+        "sha256": "0d5a467d2125b37420fbd3c64fa6af9e8a3ef34a5230e0d37d366786d489fd8b",
+        "tokens": 178
+      },
+      {
+        "path": "archive_manager/completion/audiobook.py",
+        "sha256": "e6149488bb90c91e5dc2f4f237049836b9c43136ccd38dedf6588855464f95ab",
+        "tokens": 2445
+      },
+      {
+        "path": "archive_manager/completion/cli.py",
+        "sha256": "4267a7776a430dba0b94cefddbaaf03a7033682e58ed7cba3c6668410d89eed8",
+        "tokens": 1183
+      },
+      {
+        "path": "archive_manager/completion/clients.py",
+        "sha256": "dee3aee4cd5d544d2e13107f1bae9a24df81c45d4a673aef0bc79558f791cdbe",
+        "tokens": 2727
+      },
+      {
+        "path": "archive_manager/completion/detector.py",
+        "sha256": "16f19a533d373bf3eed4534d4ed8f560873346e6a7dc0abd762b1affbac92a51",
+        "tokens": 3646
+      },
+      {
+        "path": "archive_manager/completion/handler.py",
+        "sha256": "d4195a88f5727a253de2992c1deabf1417d9bb6eec6deb9e1e098f08a1df776a",
+        "tokens": 4384
+      },
+      {
+        "path": "archive_manager/completion/subtitles.py",
+        "sha256": "28445c1539d6cf256c664558e5c15f9d67e18c3adde2f814a36578bb1cf8cef1",
+        "tokens": 1634
+      },
+      {
+        "path": "archive_manager/core/__init__.py",
+        "sha256": "03a833953c530d98c0abc93a69d5f4560d5509d1456b5139787fc2e3e5dd118c",
+        "tokens": 87
+      },
+      {
+        "path": "archive_manager/core/audio_probe.py",
+        "sha256": "f0cb169d9cb089dfd9f2e2ee360bea96b6b7ab239df1fcfcb772b2d7cb476175",
+        "tokens": 1112
+      },
+      {
+        "path": "archive_manager/core/classifier.py",
+        "sha256": "1318c322170b040a57033e80cea19512a3565c6ec7f186f9b612f957be53a50d",
+        "tokens": 2227
+      },
+      {
+        "path": "archive_manager/core/llm_classifier.py",
+        "sha256": "c099ef4e6a73a02a1718050f5b201daf69148df15069d9447836639f89ab61a4",
+        "tokens": 3055
+      },
+      {
+        "path": "archive_manager/core/mam.py",
+        "sha256": "ccd8ad2f8d6ce24097cf60fbcd75fa309cb38a000ea6c96d475c648c2686af12",
+        "tokens": 1384
+      },
+      {
+        "path": "archive_manager/core/tmdb.py",
+        "sha256": "04ec40fe7b07b6c40b3960401308a2cdf2328e4ad7cc4132ef681ec323a2e09f",
+        "tokens": 1989
+      },
+      {
+        "path": "archive_manager/core/utils.py",
+        "sha256": "c1af79febe2ba72d00eabc7f0ed87e9bd9041bc4c3aff06890aed85777e2370f",
+        "tokens": 709
+      },
+      {
+        "path": "archive_manager/models/__init__.py",
+        "sha256": "c1f8cf2c05d17c5bec87796f6c041801416c2e8fbd0530c5a9419717aa007cd8",
+        "tokens": 82
+      },
+      {
+        "path": "archive_manager/models/content.py",
+        "sha256": "f53b904f10a4d3761f78902c2994a04fa92b0823153a4504b1d4983f4bd27f80",
+        "tokens": 2141
+      },
+      {
+        "path": "archive_manager/processors/__init__.py",
+        "sha256": "55a3d6e5040637c8d61e273655f9136cf7f617a07223f6c3b99ca643848e9f91",
+        "tokens": 99
+      },
+      {
+        "path": "archive_manager/processors/audiobook_metadata.py",
+        "sha256": "ec4fe6a541bca813ae10c8c3c855db33c289706bd4f3a138255c25c72903a9a4",
+        "tokens": 1749
+      },
+      {
+        "path": "archive_manager/processors/audiobook_scanner.py",
+        "sha256": "77ccbe63f165eb394b6f292ef6b0a7face68e79be646de2248f796728b41429a",
+        "tokens": 5839
+      },
+      {
+        "path": "archive_manager/processors/augmentor.py",
+        "sha256": "6cd8b50960e128209e4a02184a92411e405e65b5a707aa267519daf9f10c6d57",
+        "tokens": 5634
+      },
+      {
+        "path": "archive_manager/processors/generator.py",
+        "sha256": "11d112b9c734f193a042f21e7b9627ad26703952b537975e6a745d200b01f3e8",
+        "tokens": 7830
+      },
+      {
+        "path": "archive_manager/processors/library.py",
+        "sha256": "21c2dd027d730c1c547cabf207b7b9aae5b5f71387a36569a21ebfdad1e80bdc",
+        "tokens": 10423
+      },
+      {
+        "path": "archive_manager/processors/matcher.py",
+        "sha256": "bb6b27253bb03d37e856ff89928233c0359fbc3649a0c1188f6a5cc41b61966c",
+        "tokens": 1367
+      },
+      {
+        "path": "archive_manager/processors/organizer.py",
+        "sha256": "260d1ceeca289f221384ab0f794e269d11a6e0e1f51640bdb8ba4be885aef5d4",
+        "tokens": 849
+      },
+      {
+        "path": "archive_manager/processors/scanner.py",
+        "sha256": "823e706d98f96a469f359f1b46d21115c9ec17fd54390f8366e81dbfdf35e40d",
+        "tokens": 3265
+      },
+      {
+        "path": "archive_manager/static/app.js",
+        "sha256": "6d48dc4dce6aafb30d8aeb12550aaa7b8e4990a6303cb10f9530e71adcce8d6c",
+        "tokens": 6016
+      },
+      {
+        "path": "archive_manager/static/index.html",
+        "sha256": "0375428fab0d77e6996656f16d6143f349de72bc422da38e1e7fb843dc145940",
+        "tokens": 9116
+      },
+      {
+        "path": "archive_manager/static/style.css",
+        "sha256": "42c617b80b2d3951619d5824e3315e0b632f79e03fcf96b7130f7479d3dc92b3",
+        "tokens": 2119
+      },
+      {
+        "path": "tests/test_audiobook_augmentor.py",
+        "sha256": "85aa2a9d08533a0df655c1c1b2c81e2d5feb04fe4c9dd90d94a1fd38a1c93be7",
+        "tokens": 2254
+      },
+      {
+        "path": "tests/test_audiobook_scanner.py",
+        "sha256": "1b5f5572912a9a22f250bc0c87d4f222176179041288180a2e4dcbb107a3aeaa",
+        "tokens": 4333
+      },
+      {
+        "path": "tests/test_classifier.py",
+        "sha256": "177f3723337f04c7a99e45d83e4da396c07d02b9122da4102dd544ce99232a0e",
+        "tokens": 476
+      },
+      {
+        "path": "tests/test_completion_audiobook.py",
+        "sha256": "6708c0e7c60c31ccb556ee803f9b5d51f8d4d837b6da21b8b02843b4a3723233",
+        "tokens": 468
+      },
+      {
+        "path": "tests/test_generator_audiobook.py",
+        "sha256": "80df3b1aa7f590e8729e2eb1c6ebb01a49ec07efd242d99fa97950e9154064a0",
+        "tokens": 572
+      },
+      {
+        "path": "tests/test_subtitles.py",
+        "sha256": "dd1e7ca16c26ca38c5d6929ab51c8876738d0a3ce2b0c11b33f0ceea36ac27b2",
+        "tokens": 1870
+      }
+    ],
+    "bottom_audio_player": [
+      {
+        "path": "CHANGELOG.md",
+        "sha256": "a6a55201c9142db18751b82dee8c46c6c8c8a8b9c12a51a2feab46f49ebe5f60",
+        "tokens": 184
+      },
+      {
+        "path": "METADATA.json",
+        "sha256": "71eec564d085e89a6c2685684c798ba3dab63676f54eb2920bb0845f5ddf84d7",
+        "tokens": 536
+      },
+      {
+        "path": "README.md",
+        "sha256": "25b6b776c2e7b8e3aa6e0762435ad5f48c9b783ec3d214739344782283b17782",
+        "tokens": 2075
+      },
+      {
+        "path": "USAGE.md",
+        "sha256": "0bf7dede4af241f4e69ae06cd07c32e76fe6c5cc27cd186f23c497eec4e0b6db",
+        "tokens": 941
+      },
+      {
+        "path": "bottom-audio-player.css",
+        "sha256": "7a175174e562e3f538e8fa881b090a7183c06726ce5f1b9530e06c9f201779ba",
+        "tokens": 1710
+      },
+      {
+        "path": "bottom-audio-player.js",
+        "sha256": "292b0a6e34f0329e22c1339e89514639f41ffc65d4d55ceae0de33fd13e70da6",
+        "tokens": 4166
+      },
+      {
+        "path": "demo.html",
+        "sha256": "33f64d610a232f608a7cbd746b13b7d34a8dcf67428c88737c17d2fe65da6ccb",
+        "tokens": 539
+      },
+      {
+        "path": "package.json",
+        "sha256": "966eed0fc738dc458f889c4c7c7f9d732d5c3120b0240f579f11702695802b29",
+        "tokens": 191
+      }
+    ],
+    "bunny_cdn": [
+      {
+        "path": "Cargo.toml",
+        "sha256": "b7ad627bf52db5a31273c82135cfbf6ff891e4f30a92ba78c9b0703001654c53",
+        "tokens": 234
+      },
+      {
+        "path": "METADATA.json",
+        "sha256": "11d57e5b06049a382ddb0694b7f4553ca35c994db13a49bbb230f43522108814",
+        "tokens": 475
+      },
+      {
+        "path": "README.md",
+        "sha256": "d10e7fec5ec16cfd5712347d9694580f972027c6747569fb561f4e3ff053c449",
+        "tokens": 1220
+      },
+      {
+        "path": "docker-compose.yml",
+        "sha256": "749c5823e1a50b9a7d0337bd0de963c69232f672a5552a8c94a2780815dbd78b",
+        "tokens": 118
+      },
+      {
+        "path": "token.py",
+        "sha256": "f943bdc057a550acf080b6b1f62b43d1c258f3184c86cd127a71d1537f2a4385",
+        "tokens": 630
+      },
+      {
+        "path": "analytics/app.py",
+        "sha256": "503fe43407d3d71630a57909afd4e5f99ccd35d5984280411a573a8c93f4b4e2",
+        "tokens": 5678
+      },
+      {
+        "path": "analytics/requirements.txt",
+        "sha256": "d62c5afef30490c9b5b256ee8130213886ff8c05e72a9669fe6f109ed6eb7d8c",
+        "tokens": 50
+      },
+      {
+        "path": "config/default.toml",
+        "sha256": "d48a8abfbe6e0e9fd71364f1c705e412e3f15caa30d700addb7e124f9212d569",
+        "tokens": 479
+      },
+      {
+        "path": "src/main.rs",
+        "sha256": "38e8b76a7be5ef9dcbf4d34038382dc10396a3651b81099b72bfbbd6a30f8830",
+        "tokens": 12520
+      }
+    ]
+  },
+  "scoring_passes": [
+    {
+      "project": "archive_manager",
+      "mode": "general",
+      "task": null,
+      "cold_seconds": null,
+      "warm_seconds": 0.0023671798408031464,
+      "recovery_seconds": 0.002741331234574318,
+      "cold_usage": [
+        {
+          "stage": "general",
+          "cache_hit": false,
+          "cached_files": 0,
+          "scored_files": 44,
+          "requests": 8,
+          "input_tokens": 168166,
+          "estimated_cost_usd": 0.007062972,
+          "model": "jev-1.13.0"
+        }
+      ],
+      "warm_usage": [
+        {
+          "stage": "general",
+          "cache_hit": true,
+          "cached_files": 44,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        }
+      ],
+      "scores": {
+        "METADATA.json": 0.97,
+        "README.md": 1.05,
+        "USAGE.md": 0.96,
+        "archive_manager/__init__.py": 1.7,
+        "archive_manager/cli.py": 1.49,
+        "archive_manager/completion/__init__.py": 0.96,
+        "archive_manager/completion/audiobook.py": 1.15,
+        "archive_manager/completion/cli.py": 1.3,
+        "archive_manager/completion/clients.py": 1.1,
+        "archive_manager/completion/detector.py": 1.3,
+        "archive_manager/completion/handler.py": 1.83,
+        "archive_manager/completion/subtitles.py": 1.04,
+        "archive_manager/config.py": 1.42,
+        "archive_manager/core/__init__.py": 0.98,
+        "archive_manager/core/audio_probe.py": 1.28,
+        "archive_manager/core/classifier.py": 1.42,
+        "archive_manager/core/llm_classifier.py": 1.62,
+        "archive_manager/core/mam.py": 1.01,
+        "archive_manager/core/tmdb.py": 1.02,
+        "archive_manager/core/utils.py": 0.98,
+        "archive_manager/models/__init__.py": 0.95,
+        "archive_manager/models/content.py": 1.31,
+        "archive_manager/processors/__init__.py": 0.92,
+        "archive_manager/processors/audiobook_metadata.py": 1.14,
+        "archive_manager/processors/audiobook_scanner.py": 1.87,
+        "archive_manager/processors/augmentor.py": 1.47,
+        "archive_manager/processors/generator.py": 1.59,
+        "archive_manager/processors/library.py": 1.75,
+        "archive_manager/processors/matcher.py": 1.06,
+        "archive_manager/processors/organizer.py": 1.04,
+        "archive_manager/processors/scanner.py": 1.24,
+        "archive_manager/server.py": 1.55,
+        "archive_manager/static/app.js": 1.01,
+        "archive_manager/static/index.html": 0.94,
+        "archive_manager/static/style.css": 0.26,
+        "pyproject.toml": 1.1,
+        "requirements.txt": 0.85,
+        "test_basic.py": 0.79,
+        "tests/test_audiobook_augmentor.py": 1.04,
+        "tests/test_audiobook_scanner.py": 1.05,
+        "tests/test_classifier.py": 0.86,
+        "tests/test_completion_audiobook.py": 0.96,
+        "tests/test_generator_audiobook.py": 0.98,
+        "tests/test_subtitles.py": 1.09
+      }
+    },
+    {
+      "project": "archive_manager",
+      "mode": "prompt",
+      "task": "episodes",
+      "cold_seconds": 4.447338987141848,
+      "warm_seconds": 2.4229449052363634,
+      "recovery_seconds": null,
+      "cold_usage": [
+        {
+          "stage": "general",
+          "cache_hit": true,
+          "cached_files": 44,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        },
+        {
+          "stage": "prompt",
+          "cache_hit": false,
+          "cached_files": 0,
+          "scored_files": 44,
+          "requests": 1,
+          "input_tokens": 51067,
+          "estimated_cost_usd": 0.002144814,
+          "model": "jev-1.13.0"
+        }
+      ],
+      "warm_usage": [
+        {
+          "stage": "general",
+          "cache_hit": true,
+          "cached_files": 44,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        },
+        {
+          "stage": "prompt",
+          "cache_hit": true,
+          "cached_files": 44,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        }
+      ],
+      "scores": {
+        "METADATA.json": 0.05,
+        "README.md": 0.22,
+        "USAGE.md": 0.11,
+        "archive_manager/__init__.py": 0.41,
+        "archive_manager/cli.py": 0.23,
+        "archive_manager/completion/__init__.py": 0.11,
+        "archive_manager/completion/audiobook.py": 0.05,
+        "archive_manager/completion/cli.py": 0.08,
+        "archive_manager/completion/clients.py": 0.05,
+        "archive_manager/completion/detector.py": 0.78,
+        "archive_manager/completion/handler.py": 0.39,
+        "archive_manager/completion/subtitles.py": 0.18,
+        "archive_manager/config.py": 0.42,
+        "archive_manager/core/__init__.py": 0.49,
+        "archive_manager/core/audio_probe.py": 0.06,
+        "archive_manager/core/classifier.py": 1.97,
+        "archive_manager/core/llm_classifier.py": 0.04,
+        "archive_manager/core/mam.py": 0.02,
+        "archive_manager/core/tmdb.py": 0.09,
+        "archive_manager/core/utils.py": 0.06,
+        "archive_manager/models/__init__.py": 0.6,
+        "archive_manager/models/content.py": 0.63,
+        "archive_manager/processors/__init__.py": 0.2,
+        "archive_manager/processors/audiobook_metadata.py": 0.08,
+        "archive_manager/processors/audiobook_scanner.py": 0.07,
+        "archive_manager/processors/augmentor.py": 0.03,
+        "archive_manager/processors/generator.py": 0.61,
+        "archive_manager/processors/library.py": 0.81,
+        "archive_manager/processors/matcher.py": 0.22,
+        "archive_manager/processors/organizer.py": 0.07,
+        "archive_manager/processors/scanner.py": 0.12,
+        "archive_manager/server.py": 0.11,
+        "archive_manager/static/app.js": 0.02,
+        "archive_manager/static/index.html": 0.01,
+        "archive_manager/static/style.css": 0.0,
+        "pyproject.toml": 0.46,
+        "requirements.txt": 0.28,
+        "test_basic.py": 0.04,
+        "tests/test_audiobook_augmentor.py": 0.03,
+        "tests/test_audiobook_scanner.py": 0.09,
+        "tests/test_classifier.py": 1.8,
+        "tests/test_completion_audiobook.py": 0.13,
+        "tests/test_generator_audiobook.py": 0.09,
+        "tests/test_subtitles.py": 0.11
+      }
+    },
+    {
+      "project": "archive_manager",
+      "mode": "prompt",
+      "task": "subtitles",
+      "cold_seconds": 4.345242768526077,
+      "warm_seconds": 2.433845393359661,
+      "recovery_seconds": null,
+      "cold_usage": [
+        {
+          "stage": "general",
+          "cache_hit": true,
+          "cached_files": 44,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        },
+        {
+          "stage": "prompt",
+          "cache_hit": false,
+          "cached_files": 0,
+          "scored_files": 44,
+          "requests": 1,
+          "input_tokens": 51029,
+          "estimated_cost_usd": 0.002143218,
+          "model": "jev-1.13.0"
+        }
+      ],
+      "warm_usage": [
+        {
+          "stage": "general",
+          "cache_hit": true,
+          "cached_files": 44,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        },
+        {
+          "stage": "prompt",
+          "cache_hit": true,
+          "cached_files": 44,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        }
+      ],
+      "scores": {
+        "METADATA.json": 0.05,
+        "README.md": 0.58,
+        "USAGE.md": 0.8,
+        "archive_manager/__init__.py": 1.43,
+        "archive_manager/cli.py": 1.09,
+        "archive_manager/completion/__init__.py": 0.49,
+        "archive_manager/completion/audiobook.py": 0.16,
+        "archive_manager/completion/cli.py": 0.59,
+        "archive_manager/completion/clients.py": 0.44,
+        "archive_manager/completion/detector.py": 1.04,
+        "archive_manager/completion/handler.py": 1.59,
+        "archive_manager/completion/subtitles.py": 1.97,
+        "archive_manager/config.py": 1.03,
+        "archive_manager/core/__init__.py": 0.2,
+        "archive_manager/core/audio_probe.py": 0.58,
+        "archive_manager/core/classifier.py": 0.48,
+        "archive_manager/core/llm_classifier.py": 0.05,
+        "archive_manager/core/mam.py": 0.07,
+        "archive_manager/core/tmdb.py": 0.05,
+        "archive_manager/core/utils.py": 0.22,
+        "archive_manager/models/__init__.py": 0.47,
+        "archive_manager/models/content.py": 1.35,
+        "archive_manager/processors/__init__.py": 0.19,
+        "archive_manager/processors/audiobook_metadata.py": 0.28,
+        "archive_manager/processors/audiobook_scanner.py": 0.19,
+        "archive_manager/processors/augmentor.py": 0.08,
+        "archive_manager/processors/generator.py": 0.35,
+        "archive_manager/processors/library.py": 1.31,
+        "archive_manager/processors/matcher.py": 0.13,
+        "archive_manager/processors/organizer.py": 0.16,
+        "archive_manager/processors/scanner.py": 0.12,
+        "archive_manager/server.py": 0.55,
+        "archive_manager/static/app.js": 0.3,
+        "archive_manager/static/index.html": 0.05,
+        "archive_manager/static/style.css": 0.0,
+        "pyproject.toml": 0.75,
+        "requirements.txt": 0.78,
+        "test_basic.py": 0.04,
+        "tests/test_audiobook_augmentor.py": 0.06,
+        "tests/test_audiobook_scanner.py": 0.11,
+        "tests/test_classifier.py": 0.06,
+        "tests/test_completion_audiobook.py": 0.53,
+        "tests/test_generator_audiobook.py": 0.15,
+        "tests/test_subtitles.py": 1.42
+      }
+    },
+    {
+      "project": "archive_manager",
+      "mode": "prompt",
+      "task": "book_metadata",
+      "cold_seconds": 4.291831377893686,
+      "warm_seconds": 2.4211861565709114,
+      "recovery_seconds": null,
+      "cold_usage": [
+        {
+          "stage": "general",
+          "cache_hit": true,
+          "cached_files": 44,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        },
+        {
+          "stage": "prompt",
+          "cache_hit": false,
+          "cached_files": 0,
+          "scored_files": 44,
+          "requests": 1,
+          "input_tokens": 51065,
+          "estimated_cost_usd": 0.00214473,
+          "model": "jev-1.13.0"
+        }
+      ],
+      "warm_usage": [
+        {
+          "stage": "general",
+          "cache_hit": true,
+          "cached_files": 44,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        },
+        {
+          "stage": "prompt",
+          "cache_hit": true,
+          "cached_files": 44,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        }
+      ],
+      "scores": {
+        "METADATA.json": 0.08,
+        "README.md": 0.59,
+        "USAGE.md": 0.46,
+        "archive_manager/__init__.py": 0.88,
+        "archive_manager/cli.py": 0.52,
+        "archive_manager/completion/__init__.py": 0.6,
+        "archive_manager/completion/audiobook.py": 1.33,
+        "archive_manager/completion/cli.py": 0.41,
+        "archive_manager/completion/clients.py": 0.32,
+        "archive_manager/completion/detector.py": 0.99,
+        "archive_manager/completion/handler.py": 1.81,
+        "archive_manager/completion/subtitles.py": 0.21,
+        "archive_manager/config.py": 1.19,
+        "archive_manager/core/__init__.py": 0.31,
+        "archive_manager/core/audio_probe.py": 1.28,
+        "archive_manager/core/classifier.py": 0.48,
+        "archive_manager/core/llm_classifier.py": 1.29,
+        "archive_manager/core/mam.py": 0.99,
+        "archive_manager/core/tmdb.py": 0.22,
+        "archive_manager/core/utils.py": 1.02,
+        "archive_manager/models/__init__.py": 0.58,
+        "archive_manager/models/content.py": 1.51,
+        "archive_manager/processors/__init__.py": 0.48,
+        "archive_manager/processors/audiobook_metadata.py": 1.91,
+        "archive_manager/processors/audiobook_scanner.py": 1.98,
+        "archive_manager/processors/augmentor.py": 0.89,
+        "archive_manager/processors/generator.py": 1.58,
+        "archive_manager/processors/library.py": 1.82,
+        "archive_manager/processors/matcher.py": 0.55,
+        "archive_manager/processors/organizer.py": 0.46,
+        "archive_manager/processors/scanner.py": 0.22,
+        "archive_manager/server.py": 0.41,
+        "archive_manager/static/app.js": 0.06,
+        "archive_manager/static/index.html": 0.02,
+        "archive_manager/static/style.css": 0.0,
+        "pyproject.toml": 0.36,
+        "requirements.txt": 0.37,
+        "test_basic.py": 0.04,
+        "tests/test_audiobook_augmentor.py": 0.9,
+        "tests/test_audiobook_scanner.py": 1.37,
+        "tests/test_classifier.py": 0.15,
+        "tests/test_completion_audiobook.py": 1.43,
+        "tests/test_generator_audiobook.py": 1.29,
+        "tests/test_subtitles.py": 0.1
+      }
+    },
+    {
+      "project": "bottom_audio_player",
+      "mode": "general",
+      "task": null,
+      "cold_seconds": 1.166660487651825,
+      "warm_seconds": 0.0016933158040046692,
+      "recovery_seconds": null,
+      "cold_usage": [
+        {
+          "stage": "general",
+          "cache_hit": false,
+          "cached_files": 0,
+          "scored_files": 8,
+          "requests": 1,
+          "input_tokens": 13584,
+          "estimated_cost_usd": 0.000570528,
+          "model": "jev-1.13.0"
+        }
+      ],
+      "warm_usage": [
+        {
+          "stage": "general",
+          "cache_hit": true,
+          "cached_files": 8,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        }
+      ],
+      "scores": {
+        "CHANGELOG.md": 0.63,
+        "METADATA.json": 0.94,
+        "README.md": 1.0,
+        "USAGE.md": 0.8,
+        "bottom-audio-player.css": 0.97,
+        "bottom-audio-player.js": 1.94,
+        "demo.html": 0.58,
+        "package.json": 0.77
+      }
+    },
+    {
+      "project": "bottom_audio_player",
+      "mode": "prompt",
+      "task": "downloads",
+      "cold_seconds": 0.9815193638205528,
+      "warm_seconds": 0.06489508971571922,
+      "recovery_seconds": null,
+      "cold_usage": [
+        {
+          "stage": "general",
+          "cache_hit": true,
+          "cached_files": 8,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        },
+        {
+          "stage": "prompt",
+          "cache_hit": false,
+          "cached_files": 0,
+          "scored_files": 8,
+          "requests": 1,
+          "input_tokens": 9036,
+          "estimated_cost_usd": 0.000379512,
+          "model": "jev-1.13.0"
+        }
+      ],
+      "warm_usage": [
+        {
+          "stage": "general",
+          "cache_hit": true,
+          "cached_files": 8,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        },
+        {
+          "stage": "prompt",
+          "cache_hit": true,
+          "cached_files": 8,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        }
+      ],
+      "scores": {
+        "CHANGELOG.md": 0.06,
+        "METADATA.json": 0.03,
+        "README.md": 0.46,
+        "USAGE.md": 0.49,
+        "bottom-audio-player.css": 0.15,
+        "bottom-audio-player.js": 1.99,
+        "demo.html": 0.21,
+        "package.json": 0.26
+      }
+    },
+    {
+      "project": "bottom_audio_player",
+      "mode": "prompt",
+      "task": "speed",
+      "cold_seconds": 0.9119000304490328,
+      "warm_seconds": 0.08573423139750957,
+      "recovery_seconds": null,
+      "cold_usage": [
+        {
+          "stage": "general",
+          "cache_hit": true,
+          "cached_files": 8,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        },
+        {
+          "stage": "prompt",
+          "cache_hit": false,
+          "cached_files": 0,
+          "scored_files": 8,
+          "requests": 1,
+          "input_tokens": 9030,
+          "estimated_cost_usd": 0.00037926,
+          "model": "jev-1.13.0"
+        }
+      ],
+      "warm_usage": [
+        {
+          "stage": "general",
+          "cache_hit": true,
+          "cached_files": 8,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        },
+        {
+          "stage": "prompt",
+          "cache_hit": true,
+          "cached_files": 8,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        }
+      ],
+      "scores": {
+        "CHANGELOG.md": 0.1,
+        "METADATA.json": 0.05,
+        "README.md": 0.56,
+        "USAGE.md": 0.7,
+        "bottom-audio-player.css": 0.04,
+        "bottom-audio-player.js": 1.99,
+        "demo.html": 0.12,
+        "package.json": 0.24
+      }
+    },
+    {
+      "project": "bottom_audio_player",
+      "mode": "prompt",
+      "task": "layout",
+      "cold_seconds": 0.902003712952137,
+      "warm_seconds": 0.06563923507928848,
+      "recovery_seconds": null,
+      "cold_usage": [
+        {
+          "stage": "general",
+          "cache_hit": true,
+          "cached_files": 8,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        },
+        {
+          "stage": "prompt",
+          "cache_hit": false,
+          "cached_files": 0,
+          "scored_files": 8,
+          "requests": 1,
+          "input_tokens": 9037,
+          "estimated_cost_usd": 0.00037955400000000005,
+          "model": "jev-1.13.0"
+        }
+      ],
+      "warm_usage": [
+        {
+          "stage": "general",
+          "cache_hit": true,
+          "cached_files": 8,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        },
+        {
+          "stage": "prompt",
+          "cache_hit": true,
+          "cached_files": 8,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        }
+      ],
+      "scores": {
+        "CHANGELOG.md": 0.09,
+        "METADATA.json": 0.07,
+        "README.md": 1.0,
+        "USAGE.md": 0.97,
+        "bottom-audio-player.css": 1.86,
+        "bottom-audio-player.js": 1.99,
+        "demo.html": 0.45,
+        "package.json": 0.24
+      }
+    },
+    {
+      "project": "bunny_cdn",
+      "mode": "general",
+      "task": null,
+      "cold_seconds": 1.5337817277759314,
+      "warm_seconds": 0.0016555245965719223,
+      "recovery_seconds": null,
+      "cold_usage": [
+        {
+          "stage": "general",
+          "cache_hit": false,
+          "cached_files": 0,
+          "scored_files": 9,
+          "requests": 1,
+          "input_tokens": 25490,
+          "estimated_cost_usd": 0.0010705800000000002,
+          "model": "jev-1.13.0"
+        }
+      ],
+      "warm_usage": [
+        {
+          "stage": "general",
+          "cache_hit": true,
+          "cached_files": 9,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        }
+      ],
+      "scores": {
+        "Cargo.toml": 0.95,
+        "METADATA.json": 0.94,
+        "README.md": 0.99,
+        "analytics/app.py": 1.27,
+        "analytics/requirements.txt": 0.69,
+        "config/default.toml": 1.19,
+        "docker-compose.yml": 0.79,
+        "src/main.rs": 1.9,
+        "token.py": 0.54
+      }
+    },
+    {
+      "project": "bunny_cdn",
+      "mode": "prompt",
+      "task": "downloads",
+      "cold_seconds": 1.4007501974701881,
+      "warm_seconds": 0.20474682934582233,
+      "recovery_seconds": null,
+      "cold_usage": [
+        {
+          "stage": "general",
+          "cache_hit": true,
+          "cached_files": 9,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        },
+        {
+          "stage": "prompt",
+          "cache_hit": false,
+          "cached_files": 0,
+          "scored_files": 9,
+          "requests": 1,
+          "input_tokens": 20675,
+          "estimated_cost_usd": 0.00086835,
+          "model": "jev-1.13.0"
+        }
+      ],
+      "warm_usage": [
+        {
+          "stage": "general",
+          "cache_hit": true,
+          "cached_files": 9,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        },
+        {
+          "stage": "prompt",
+          "cache_hit": true,
+          "cached_files": 9,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        }
+      ],
+      "scores": {
+        "Cargo.toml": 0.36,
+        "METADATA.json": 0.01,
+        "README.md": 0.63,
+        "analytics/app.py": 0.14,
+        "analytics/requirements.txt": 0.05,
+        "config/default.toml": 1.06,
+        "docker-compose.yml": 0.03,
+        "src/main.rs": 1.99,
+        "token.py": 0.6
+      }
+    },
+    {
+      "project": "bunny_cdn",
+      "mode": "prompt",
+      "task": "uploads",
+      "cold_seconds": 1.3120560199022293,
+      "warm_seconds": 0.21464056707918644,
+      "recovery_seconds": null,
+      "cold_usage": [
+        {
+          "stage": "general",
+          "cache_hit": true,
+          "cached_files": 9,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        },
+        {
+          "stage": "prompt",
+          "cache_hit": false,
+          "cached_files": 0,
+          "scored_files": 9,
+          "requests": 1,
+          "input_tokens": 20666,
+          "estimated_cost_usd": 0.0008679720000000001,
+          "model": "jev-1.13.0"
+        }
+      ],
+      "warm_usage": [
+        {
+          "stage": "general",
+          "cache_hit": true,
+          "cached_files": 9,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        },
+        {
+          "stage": "prompt",
+          "cache_hit": true,
+          "cached_files": 9,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        }
+      ],
+      "scores": {
+        "Cargo.toml": 0.67,
+        "METADATA.json": 0.02,
+        "README.md": 0.73,
+        "analytics/app.py": 0.54,
+        "analytics/requirements.txt": 0.11,
+        "config/default.toml": 1.29,
+        "docker-compose.yml": 0.14,
+        "src/main.rs": 1.98,
+        "token.py": 0.23
+      }
+    },
+    {
+      "project": "bunny_cdn",
+      "mode": "prompt",
+      "task": "ingestion",
+      "cold_seconds": 1.381244894117117,
+      "warm_seconds": 0.20371849834918976,
+      "recovery_seconds": null,
+      "cold_usage": [
+        {
+          "stage": "general",
+          "cache_hit": true,
+          "cached_files": 9,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        },
+        {
+          "stage": "prompt",
+          "cache_hit": false,
+          "cached_files": 0,
+          "scored_files": 9,
+          "requests": 1,
+          "input_tokens": 20673,
+          "estimated_cost_usd": 0.000868266,
+          "model": "jev-1.13.0"
+        }
+      ],
+      "warm_usage": [
+        {
+          "stage": "general",
+          "cache_hit": true,
+          "cached_files": 9,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        },
+        {
+          "stage": "prompt",
+          "cache_hit": true,
+          "cached_files": 9,
+          "scored_files": 0,
+          "requests": 0,
+          "input_tokens": 0,
+          "estimated_cost_usd": 0.0,
+          "model": "jev-1.13.0"
+        }
+      ],
+      "scores": {
+        "Cargo.toml": 0.1,
+        "METADATA.json": 0.02,
+        "README.md": 0.41,
+        "analytics/app.py": 1.98,
+        "analytics/requirements.txt": 0.48,
+        "config/default.toml": 0.93,
+        "docker-compose.yml": 0.39,
+        "src/main.rs": 0.52,
+        "token.py": 0.03
+      }
+    }
+  ],
+  "qa_grading": {
+    "qa_results_sha256": "283c3413233195bec7a451c3ad024ecc2b13223b6021050d04c506a7ef5faf4c",
+    "policy": "All requested factual components must be correct; unknown/partial answers fail. Grounded correctness also requires sufficient quoted evidence.",
+    "grades": [
+      {
+        "project": "bottom_audio_player",
+        "mode": "reference",
+        "task": null,
+        "context": "contexts/bottom_audio_player/reference-all-full.txt",
+        "correct_ids": [
+          "ba_d1",
+          "ba_d2",
+          "ba_d3",
+          "ba_d4",
+          "ba_s1",
+          "ba_s2",
+          "ba_s3",
+          "ba_s4",
+          "ba_l1",
+          "ba_l2",
+          "ba_l3",
+          "ba_l4"
+        ],
+        "grounded_correct_ids": [
+          "ba_d1",
+          "ba_d2",
+          "ba_d3",
+          "ba_d4",
+          "ba_s1",
+          "ba_s2",
+          "ba_s3",
+          "ba_s4",
+          "ba_l1",
+          "ba_l2",
+          "ba_l3",
+          "ba_l4"
+        ],
+        "total": 12,
+        "notes": {}
+      },
+      {
+        "project": "archive_manager",
+        "mode": "general",
+        "task": "book_metadata",
+        "context": "contexts/archive_manager/general-all-12000.txt",
+        "correct_ids": [],
+        "grounded_correct_ids": [],
+        "total": 4,
+        "notes": {}
+      },
+      {
+        "project": "bunny_cdn",
+        "mode": "general",
+        "task": "downloads",
+        "context": "contexts/bunny_cdn/general-all-12000.txt",
+        "correct_ids": [],
+        "grounded_correct_ids": [],
+        "total": 4,
+        "notes": {}
+      },
+      {
+        "project": "bunny_cdn",
+        "mode": "prompt",
+        "task": "uploads",
+        "context": "contexts/bunny_cdn/prompt-uploads-12000.txt",
+        "correct_ids": [],
+        "grounded_correct_ids": [],
+        "total": 4,
+        "notes": {}
+      },
+      {
+        "project": "archive_manager",
+        "mode": "prompt",
+        "task": "subtitles",
+        "context": "contexts/archive_manager/prompt-subtitles-12000.txt",
+        "correct_ids": [
+          "am_s1",
+          "am_s2",
+          "am_s3",
+          "am_s4"
+        ],
+        "grounded_correct_ids": [
+          "am_s1",
+          "am_s2",
+          "am_s3",
+          "am_s4"
+        ],
+        "total": 4,
+        "notes": {}
+      },
+      {
+        "project": "bottom_audio_player",
+        "mode": "general",
+        "task": "layout",
+        "context": "contexts/bottom_audio_player/general-all-12000.txt",
+        "correct_ids": [
+          "ba_l1",
+          "ba_l4"
+        ],
+        "grounded_correct_ids": [
+          "ba_l1",
+          "ba_l4"
+        ],
+        "total": 4,
+        "notes": {}
+      },
+      {
+        "project": "archive_manager",
+        "mode": "prompt",
+        "task": "episodes",
+        "context": "contexts/archive_manager/prompt-episodes-12000.txt",
+        "correct_ids": [
+          "am_e1",
+          "am_e2",
+          "am_e3",
+          "am_e4"
+        ],
+        "grounded_correct_ids": [
+          "am_e1",
+          "am_e2",
+          "am_e3",
+          "am_e4"
+        ],
+        "total": 4,
+        "notes": {}
+      },
+      {
+        "project": "bunny_cdn",
+        "mode": "baseline",
+        "task": "ingestion",
+        "context": "contexts/bunny_cdn/baseline-all-12000.txt",
+        "correct_ids": [
+          "bc_i1",
+          "bc_i2",
+          "bc_i3",
+          "bc_i4"
+        ],
+        "grounded_correct_ids": [
+          "bc_i1",
+          "bc_i2",
+          "bc_i3",
+          "bc_i4"
+        ],
+        "total": 4,
+        "notes": {}
+      },
+      {
+        "project": "bunny_cdn",
+        "mode": "prompt",
+        "task": "downloads",
+        "context": "contexts/bunny_cdn/prompt-downloads-12000.txt",
+        "correct_ids": [],
+        "grounded_correct_ids": [],
+        "total": 4,
+        "notes": {}
+      },
+      {
+        "project": "archive_manager",
+        "mode": "baseline",
+        "task": "subtitles",
+        "context": "contexts/archive_manager/baseline-all-12000.txt",
+        "correct_ids": [],
+        "grounded_correct_ids": [],
+        "total": 4,
+        "notes": {}
+      },
+      {
+        "project": "bottom_audio_player",
+        "mode": "prompt",
+        "task": "layout",
+        "context": "contexts/bottom_audio_player/prompt-layout-12000.txt",
+        "correct_ids": [
+          "ba_l1",
+          "ba_l2",
+          "ba_l3",
+          "ba_l4"
+        ],
+        "grounded_correct_ids": [
+          "ba_l1",
+          "ba_l2",
+          "ba_l3",
+          "ba_l4"
+        ],
+        "total": 4,
+        "notes": {}
+      },
+      {
+        "project": "bottom_audio_player",
+        "mode": "baseline",
+        "task": "layout",
+        "context": "contexts/bottom_audio_player/baseline-all-12000.txt",
+        "correct_ids": [
+          "ba_l1",
+          "ba_l2",
+          "ba_l3",
+          "ba_l4"
+        ],
+        "grounded_correct_ids": [
+          "ba_l1",
+          "ba_l2",
+          "ba_l3",
+          "ba_l4"
+        ],
+        "total": 4,
+        "notes": {}
+      },
+      {
+        "project": "bottom_audio_player",
+        "mode": "prompt",
+        "task": "downloads",
+        "context": "contexts/bottom_audio_player/prompt-downloads-12000.txt",
+        "correct_ids": [
+          "ba_d1",
+          "ba_d2",
+          "ba_d3",
+          "ba_d4"
+        ],
+        "grounded_correct_ids": [
+          "ba_d1",
+          "ba_d2",
+          "ba_d3",
+          "ba_d4"
+        ],
+        "total": 4,
+        "notes": {}
+      },
+      {
+        "project": "archive_manager",
+        "mode": "reference",
+        "task": null,
+        "context": "contexts/archive_manager/reference-all-full.txt",
+        "correct_ids": [
+          "am_e1",
+          "am_e2",
+          "am_e3",
+          "am_e4",
+          "am_s1",
+          "am_s2",
+          "am_s3",
+          "am_s4",
+          "am_b1",
+          "am_b2",
+          "am_b3",
+          "am_b4"
+        ],
+        "grounded_correct_ids": [
+          "am_e1",
+          "am_e2",
+          "am_e3",
+          "am_e4",
+          "am_s1",
+          "am_s2",
+          "am_s3",
+          "am_s4",
+          "am_b1",
+          "am_b2",
+          "am_b3",
+          "am_b4"
+        ],
+        "total": 12,
+        "notes": {}
+      },
+      {
+        "project": "bottom_audio_player",
+        "mode": "general",
+        "task": "speed",
+        "context": "contexts/bottom_audio_player/general-all-12000.txt",
+        "correct_ids": [
+          "ba_s1",
+          "ba_s2",
+          "ba_s3",
+          "ba_s4"
+        ],
+        "grounded_correct_ids": [
+          "ba_s1",
+          "ba_s2",
+          "ba_s3",
+          "ba_s4"
+        ],
+        "total": 4,
+        "notes": {}
+      },
+      {
+        "project": "bunny_cdn",
+        "mode": "general",
+        "task": "uploads",
+        "context": "contexts/bunny_cdn/general-all-12000.txt",
+        "correct_ids": [],
+        "grounded_correct_ids": [],
+        "total": 4,
+        "notes": {}
+      },
+      {
+        "project": "bottom_audio_player",
+        "mode": "prompt",
+        "task": "speed",
+        "context": "contexts/bottom_audio_player/prompt-speed-12000.txt",
+        "correct_ids": [
+          "ba_s1",
+          "ba_s2",
+          "ba_s3",
+          "ba_s4"
+        ],
+        "grounded_correct_ids": [
+          "ba_s1",
+          "ba_s2",
+          "ba_s3",
+          "ba_s4"
+        ],
+        "total": 4,
+        "notes": {}
+      },
+      {
+        "project": "bunny_cdn",
+        "mode": "baseline",
+        "task": "uploads",
+        "context": "contexts/bunny_cdn/baseline-all-12000.txt",
+        "correct_ids": [],
+        "grounded_correct_ids": [],
+        "total": 4,
+        "notes": {}
+      },
+      {
+        "project": "archive_manager",
+        "mode": "general",
+        "task": "subtitles",
+        "context": "contexts/archive_manager/general-all-12000.txt",
+        "correct_ids": [],
+        "grounded_correct_ids": [],
+        "total": 4,
+        "notes": {}
+      },
+      {
+        "project": "archive_manager",
+        "mode": "baseline",
+        "task": "book_metadata",
+        "context": "contexts/archive_manager/baseline-all-12000.txt",
+        "correct_ids": [
+          "am_b2"
+        ],
+        "grounded_correct_ids": [],
+        "total": 4,
+        "notes": {
+          "am_b1": "Partial answer: hash, length and filename are right, but requested encoding is unknown.",
+          "am_b2": "Right answer, but quotation only says directory or file and does not establish the shared-directory selection rule."
+        }
+      },
+      {
+        "project": "bottom_audio_player",
+        "mode": "baseline",
+        "task": "downloads",
+        "context": "contexts/bottom_audio_player/baseline-all-12000.txt",
+        "correct_ids": [
+          "ba_d1",
+          "ba_d2",
+          "ba_d3",
+          "ba_d4"
+        ],
+        "grounded_correct_ids": [
+          "ba_d1",
+          "ba_d2",
+          "ba_d3",
+          "ba_d4"
+        ],
+        "total": 4,
+        "notes": {}
+      },
+      {
+        "project": "bunny_cdn",
+        "mode": "baseline",
+        "task": "downloads",
+        "context": "contexts/bunny_cdn/baseline-all-12000.txt",
+        "correct_ids": [],
+        "grounded_correct_ids": [],
+        "total": 4,
+        "notes": {}
+      },
+      {
+        "project": "bottom_audio_player",
+        "mode": "baseline",
+        "task": "speed",
+        "context": "contexts/bottom_audio_player/baseline-all-12000.txt",
+        "correct_ids": [
+          "ba_s1",
+          "ba_s2",
+          "ba_s3",
+          "ba_s4"
+        ],
+        "grounded_correct_ids": [
+          "ba_s1",
+          "ba_s2",
+          "ba_s3",
+          "ba_s4"
+        ],
+        "total": 4,
+        "notes": {}
+      },
+      {
+        "project": "bottom_audio_player",
+        "mode": "general",
+        "task": "downloads",
+        "context": "contexts/bottom_audio_player/general-all-12000.txt",
+        "correct_ids": [
+          "ba_d1",
+          "ba_d2",
+          "ba_d3",
+          "ba_d4"
+        ],
+        "grounded_correct_ids": [
+          "ba_d1",
+          "ba_d2",
+          "ba_d3",
+          "ba_d4"
+        ],
+        "total": 4,
+        "notes": {}
+      },
+      {
+        "project": "bunny_cdn",
+        "mode": "general",
+        "task": "ingestion",
+        "context": "contexts/bunny_cdn/general-all-12000.txt",
+        "correct_ids": [],
+        "grounded_correct_ids": [],
+        "total": 4,
+        "notes": {}
+      },
+      {
+        "project": "archive_manager",
+        "mode": "baseline",
+        "task": "episodes",
+        "context": "contexts/archive_manager/baseline-all-12000.txt",
+        "correct_ids": [],
+        "grounded_correct_ids": [],
+        "total": 4,
+        "notes": {}
+      },
+      {
+        "project": "archive_manager",
+        "mode": "general",
+        "task": "episodes",
+        "context": "contexts/archive_manager/general-all-12000.txt",
+        "correct_ids": [],
+        "grounded_correct_ids": [],
+        "total": 4,
+        "notes": {}
+      },
+      {
+        "project": "bunny_cdn",
+        "mode": "reference",
+        "task": null,
+        "context": "contexts/bunny_cdn/reference-all-full.txt",
+        "correct_ids": [
+          "bc_d1",
+          "bc_d2",
+          "bc_d3",
+          "bc_d4",
+          "bc_u1",
+          "bc_u2",
+          "bc_u3",
+          "bc_u4",
+          "bc_i1",
+          "bc_i2",
+          "bc_i3",
+          "bc_i4"
+        ],
+        "grounded_correct_ids": [
+          "bc_d1",
+          "bc_d2",
+          "bc_d3",
+          "bc_d4",
+          "bc_u1",
+          "bc_u2",
+          "bc_u3",
+          "bc_u4",
+          "bc_i1",
+          "bc_i2",
+          "bc_i3",
+          "bc_i4"
+        ],
+        "total": 12,
+        "notes": {}
+      },
+      {
+        "project": "archive_manager",
+        "mode": "prompt",
+        "task": "book_metadata",
+        "context": "contexts/archive_manager/prompt-book_metadata-12000.txt",
+        "correct_ids": [],
+        "grounded_correct_ids": [],
+        "total": 4,
+        "notes": {}
+      },
+      {
+        "project": "bunny_cdn",
+        "mode": "prompt",
+        "task": "ingestion",
+        "context": "contexts/bunny_cdn/prompt-ingestion-12000.txt",
+        "correct_ids": [
+          "bc_i1",
+          "bc_i2",
+          "bc_i3",
+          "bc_i4"
+        ],
+        "grounded_correct_ids": [
+          "bc_i1",
+          "bc_i2",
+          "bc_i3",
+          "bc_i4"
+        ],
+        "total": 4,
+        "notes": {}
+      }
+    ]
+  },
+  "local_raw_archive_at_run": "/tmp/catenator-jev-comparison-20260918",
+  "original_snapshot_sha256": "f47d72e5508cbfb150c79949826ab03e5c7fe581467597f4e4d86418187bf471",
+  "original_cases_sha256": "90d3a2c3bdbdb09abc20267512c07845df4cfd84594eb76131eeb907d5ea7e6c"
+}

@@ -9,7 +9,8 @@ source. Whole sections, including the overview and tree, share a strict token
 budget. The optional --llm flag enables AI file summaries. --jev evaluates
 all selected source in batches to score inclusion, reuses general ratings for
 known file paths, and optionally reranks them for --prompt using general project
-context. API usage and estimated cost are reported separately from output.
+context. Providing a non-empty --prompt automatically enables Jev scoring. API
+usage and estimated cost are reported separately from output.
 
 Ignore handling: vendored/generated directories (node_modules, __pycache__,
 venv, .git, etc.) are always excluded, in every mode, at any depth. The
@@ -402,17 +403,20 @@ class Catenator:
         Overrides map paths to replacement text or (text, label); None skips
         a file. Each call takes a fresh filesystem snapshot, including when
         used by the watcher. Budgeting never rereads source or calls AI unless
-        use_llm or use_jev is explicitly enabled. Jev scores use this same
-        snapshot; prompt scoring follows a cached general scoring pass.
+        use_llm or use_jev is enabled (providing a non-empty prompt automatically
+        enables Jev scoring). Jev scores use this same snapshot; prompt scoring
+        follows a cached general scoring pass.
         """
         from .rendering import render_project
 
         if token_limit is not None and token_limit <= 0:
             raise ValueError("token_limit must be positive")
-        if prompt is not None and (not use_jev or not prompt.strip()):
-            raise ValueError("prompt requires Jev mode and non-empty text")
+        if prompt is not None:
+            if not prompt.strip():
+                raise ValueError("prompt requires non-empty text")
+            use_jev = True
         if refresh_scores and not use_jev:
-            raise ValueError("refresh_scores requires Jev mode")
+            raise ValueError("refresh_scores requires Jev mode or a prompt")
         self.last_jev_report = []
         self.last_jev_scores = {}
         files = self.collect_files()
@@ -496,7 +500,7 @@ class CatenatorEventHandler(FileSystemEventHandler):
         self.catenator.exclude_paths.add(self.output_file)
         self.token_limit = token_limit
         self.use_llm = use_llm
-        self.use_jev = use_jev
+        self.use_jev = use_jev or bool(prompt and prompt.strip())
         self.prompt = prompt
         self.cooldown = cooldown
         self.last_update = 0
@@ -644,7 +648,7 @@ def main():
     )
     parser.add_argument(
         "--prompt",
-        help="Rerank Jev scores for an instruction or query",
+        help="Rerank Jev scores for an instruction or query (automatically enables --jev)",
     )
     parser.add_argument(
         "--refresh-scores",
@@ -657,10 +661,12 @@ def main():
         parser.error("--token-limit must be positive")
     if args.watch and not args.output:
         parser.error("--watch requires --output")
-    if args.prompt is not None and (not args.jev or not args.prompt.strip()):
-        parser.error("--prompt requires --jev and non-empty text")
+    if args.prompt is not None:
+        if not args.prompt.strip():
+            parser.error("--prompt requires non-empty text")
+        args.jev = True
     if args.refresh_scores and not args.jev:
-        parser.error("--refresh-scores requires --jev")
+        parser.error("--refresh-scores requires --jev or --prompt")
 
     build_config = {}
     if args.build:
