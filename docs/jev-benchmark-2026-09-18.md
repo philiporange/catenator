@@ -9,6 +9,10 @@ These results support keeping general Jev optional. Prompted ranking helps
 with a known task, but file allocation and handling of large files still limit
 the result.
 
+The [additional three-project comparison](#three-additional-projects) also
+qualifies the first compact-input screen: docstrings improved the outlines,
+but full-source ranking still gave the best 12k answers on those new projects.
+
 ## Scope and method
 
 The benchmark tested Catenator commit `f7c5cd9` on three projects, using a
@@ -246,7 +250,8 @@ query, without first constructing a general Jev document containing source.
 Thus the prompt comparison tests a simpler scoring pipeline as well as a
 smaller input. The prior full-source measurements were reused.
 
-**Outlines without docstrings were the strongest quick-win candidate.**
+**On these original cases, outlines without docstrings were the strongest
+quick-win candidate.**
 They matched every task-evidence check retained by full-source ranking at
 all three budgets, gained four general-evidence checks at 12,000 and 24,000
 tokens, and reduced combined estimated Jev cost by **66.9%**.
@@ -307,3 +312,140 @@ or held-out projects measured. Catenator's production ranking input has not
 been changed. [Compact-input results and usage](jev-compact-inputs-2026-09-18.json)
 are preserved alongside the original benchmark data; full local receipts
 remain under `/tmp/catenator-jev-inputs-20260918/`.
+
+## Three additional projects
+
+A second comparison at commit `c259c9d` used three projects that were not in
+the first screen. Their larger Python codebases give docstrings more scope
+to affect the results.
+
+| Project | Eligible files | Source tokens | Tasks |
+|---|---:|---:|---|
+| `supervisor` | 49 | 91,554 | Service lifecycle; incremental logs; error sluice |
+| `books_server` | 70 | 160,403 | Authentication; cover refresh; generated fallback covers |
+| `bell` | 34 | 65,380 | Monitoring limits; error callbacks; progress capture |
+
+Nine task prompts and 36 source-backed facts were frozen before scoring.
+Each variant received fresh general ratings and three prompt-specific
+ratings per project. Final contexts always used the original source, the
+same renderer and thresholds, structural summaries, and 6k/12k/24k budgets.
+
+The three inputs were full source, existing outlines with first-line Python
+docstrings, and those outlines with docstring lines removed. The existing
+80-line/12,000-character outline bounds were retained. Removing docstrings
+happened after extraction, so it did not recover declarations already lost
+to that bound. Non-Python files used the same existing extractors in both
+outline variants. `books_server` needed two compact request batches with
+docstrings and one without them; the other projects needed one each.
+
+As in the first screen, full-source prompt scoring used the general Jev
+source document, while compact prompt scoring used outlines plus the query
+directly. This compares input representation and prompt pipeline together.
+Compact packing reserved space for the query before filling its source
+state; the 28k state, 30k state/question, and 60k request limits stayed fixed.
+
+**The earlier quality-equivalence result did not hold on these projects.**
+Full source gave the best task evidence and factual answers at 12k.
+Docstrings recovered useful information compared with stripped outlines,
+and their variant retained the most task evidence at 6k and 24k.
+
+All evidence and QA counts below are out of 36. Cost is estimated Jev usage
+for three general plus nine prompt passes, at $0.042/M returned input tokens.
+
+| Ranking input | General evidence at 12k | Task evidence at 6k / 12k / 24k | Correct answers at 12k | Estimated Jev cost |
+|---|---:|---:|---:|---:|
+| Full source | 7 | 26 / **34** / 34 | **35** | $0.036695 |
+| Outlines with docstrings | 7 | **28** / 32 / **36** | 32 | $0.016671 |
+| Outlines without docstrings | 3 | 26 / 29 / 33 | 30 | **$0.014328** |
+
+Per-project correct answers at 12k show where the differences occurred:
+
+| Project | Full source | With docstrings | Without docstrings |
+|---|---:|---:|---:|
+| `supervisor` | **12/12** | 8/12 | 8/12 |
+| `books_server` | 11/12 | **12/12** | 11/12 |
+| `bell` | **12/12** | **12/12** | 11/12 |
+
+In Supervisor's lifecycle task, both outline variants ranked `process.py`
+above the 8,623-token `main.py`. The 12k allocation kept the process
+implementation and summarized the API file, losing four exact endpoint and
+polling facts. Full-source ranking put `main.py` first and capped
+`process.py` at a summary. Both outline variants recovered all four facts at
+24k. At 12k, Muse answered endpoint questions with the lower-level process
+methods' tuple/bool results; the stripped-outline context also produced an
+incorrect 10-second polling interval instead of 30 seconds.
+
+Docstrings helped in two other places. For Books Server authentication,
+`routes/auth.py` scored 1.65 with docstrings, crossing the verbatim threshold
+of 1.5; full-source scoring gave it 1.14 and stripped outlines 1.48. That
+recovered two literal checks and one additional correct answer. Bell's
+callback task similarly raised `db.py` from 1.33 without docstrings to 1.58
+with them, retaining the implementation of shared callback deduplication.
+These threshold-sensitive examples warrant more runs before a default change.
+
+The equal general-context total of 7/36 at 12k also concealed a tradeoff:
+docstring outlines gained four Supervisor sluice facts and lost four Bell
+progress-capture facts. General evidence at 24k was 17/36 for full source,
+11/36 with docstrings, and 9/36 without. These are task-fact checks on a
+general context, not an independent measure of architectural understanding.
+
+The answer checks used `muse-code/muse-spark-1.3` at
+`https://llm.ph1l.uk/v1`, with the same context-only questions, no mode labels,
+temperature 0, low reasoning effort, and a 4,096-token output cap. All 30
+requests completed normally: 27 task contexts plus three complete-source
+controls. The controls answered all 36 facts correctly. Null, incorrect,
+and incomplete answers scored zero; all 144 answers were reviewed against
+the frozen expected answers and supplied source.
+
+Factual grading is separate from strict literal-quotation validation.
+Correct answers with automatically matching quotes were 29/36 for full
+source, 30/36 with docstrings, and 29/36 without; controls scored 23/36 on
+that stricter check. Several correct responses wrapped excerpts in extra
+quotes, omitted source comment markers, or mistyped a parenthesis. Those
+receipts were preserved without repair or another model call. Literal
+evidence retention is also a lower bound: for example, the middleware's
+comment explained user reuse even when the route implementation was absent.
+
+### Cost and timing on the new projects
+
+| Ranking input | General input tokens | Prompt input tokens | General cost | Prompt cost |
+|---|---:|---:|---:|---:|
+| Full source | 419,918 | 453,764 | $0.017637 | $0.019058 |
+| With docstrings | 97,969 | 298,952 | $0.004115 | $0.012556 |
+| Without docstrings | 84,053 | 257,086 | $0.003530 | $0.010798 |
+
+Combined Jev cost fell **54.6% with docstrings** and **61.0% without**.
+Once general ratings are cached, the relevant prompt-only savings are
+smaller: **34.1%** and **43.3%**, respectively. Keeping docstrings cost
+16.4% more than stripping them across this workload, and improved both
+evidence retention and answer accuracy.
+
+Median fresh task-scoring times include local input preparation and API
+calls, excluding discovery and final rendering:
+
+| Project | Full source | With docstrings | Without docstrings |
+|---|---:|---:|---:|
+| `supervisor` | 3.91 s | 2.84 s | 2.52 s |
+| `books_server` | 5.39 s | 4.95 s | 4.47 s |
+| `bell` | 2.52 s | 1.78 s | 1.63 s |
+
+The complete comparison made 54 new Jev requests, using 1,611,742 returned
+input tokens for an estimated **$0.067693164**. All 12 full-source warm
+repeats made zero scoring requests and preserved scores and 12k contexts.
+QA used 592,582 input and 33,487 output tokens; its gateway receipts did not
+report dollar charges, so QA cost is excluded from the Jev figures.
+
+All 108 comparative contexts passed independent token-budget and hash
+checks, and all 153 eligible source files still matched the frozen
+snapshot. The run completed in 5m24s with Bell job `58f8e037c785`; Bell
+made no monitoring-model requests. Catenator's production input mode was
+unchanged. [The durable results](jev-outline-holdout-2026-09-18.json) preserve
+the cases, source hashes, usage, timing, output checks, relevant scores,
+paired differences, and reviewed QA answers. Complete local receipts and
+the harness are under `/tmp/catenator-jev-holdout-20260918/`.
+
+These additional projects favor docstring outlines as the stronger compact
+candidate, while full source remains strongest at the 12k budget in this
+run. This is one rating per project/task on selected Python-heavy projects,
+with no fresh-rating variance or code-change success measurement. The
+reversal between 12k and 24k makes a universal superiority claim premature.
