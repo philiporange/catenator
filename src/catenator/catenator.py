@@ -9,7 +9,7 @@ source. Whole sections, including the overview and tree, share a strict token
 budget. The optional --llm flag enables AI file summaries. --jev scores
 bounded outlines with first-line Python docstrings in batches to rank
 inclusion, reuses general ratings for known file paths, and optionally reranks
-them for --prompt. --jev-full-source sends full source to Jev instead of
+them for --prompt. --full-source sends full source to Jev instead of
 outlines; a non-empty --prompt or full-source selection enables Jev scoring
 automatically. Final rendering always uses actual source. API usage and
 estimated cost are reported separately from output.
@@ -665,7 +665,7 @@ def main():
         help="Score file inclusion from outlines with docstrings (requires TYPESAFE_API_KEY)",
     )
     parser.add_argument(
-        "--jev-full-source",
+        "--full-source",
         action="store_true",
         help="Send full source instead of outlines with docstrings; enables Jev",
     )
@@ -688,10 +688,10 @@ def main():
         if not args.prompt.strip():
             parser.error("--prompt requires non-empty text")
         args.jev = True
-    if args.jev_full_source:
+    if args.full_source:
         args.jev = True
     if args.refresh_scores and not args.jev:
-        parser.error("--refresh-scores requires --jev, --prompt, or --jev-full-source")
+        parser.error("--refresh-scores requires --jev, --prompt, or --full-source")
 
     build_config = {}
     if args.build:
@@ -737,7 +737,7 @@ def main():
             use_jev=args.jev,
             prompt=args.prompt,
             refresh_scores=args.refresh_scores,
-            jev_full_source=args.jev_full_source,
+            jev_full_source=args.full_source,
         )
     except (JevError, ValueError) as error:
         parser.exit(1, f"catenator: {error}\n")
@@ -760,7 +760,7 @@ def main():
                 use_llm=args.llm,
                 use_jev=args.jev,
                 prompt=args.prompt,
-                jev_full_source=args.jev_full_source,
+                jev_full_source=args.full_source,
             )
             observer = Observer()
             observer.schedule(event_handler, args.directory, recursive=True)

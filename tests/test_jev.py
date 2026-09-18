@@ -602,7 +602,7 @@ def test_full_source_reuses_existing_general_cache_identity(project):
 def test_cli_full_source_implicitly_enables_jev_and_allows_refresh(project, monkeypatch, capsys, prompt):
     content = 'def main():\n    return "SOURCE_BODY"\n'
     write(project, "main.py", content)
-    args = ["catenator", str(project.root), "--jev-full-source", "--refresh-scores"]
+    args = ["catenator", str(project.root), "--full-source", "--refresh-scores"]
     if prompt is not None:
         args.extend(["--prompt", prompt])
     monkeypatch.setattr(sys, "argv", args)

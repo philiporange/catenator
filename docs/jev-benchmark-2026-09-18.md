@@ -1,9 +1,24 @@
 # Jev ranking benchmark — 18 September 2026
 
-Jev with a task prompt retained more of the required source evidence overall
-at every tested budget. Neither Jev mode was strictly better than ordinary
-Catenator: both lost useful information in individual cases, and general Jev
-performed worse at the two larger budgets.
+Catenator now uses **outlines with first-line Python docstrings** as Jev's
+default input. Use `--full-source` for full-source ranking. `--prompt`
+automatically enables Jev with either input mode:
+
+```sh
+catenator . --prompt "Explain authentication" --token-limit 12000
+catenator . --prompt "Explain authentication" --full-source --token-limit 12000
+```
+
+Ordinary Catenator remains local and requires no API credentials. Jev setup,
+cache behavior, and cost reporting are documented in the
+[README](../README.md#jev-file-scoring).
+
+The measurements below record the original full-source benchmark and two
+compact-input comparisons at their stated commits. In the original
+comparison, Jev with a task prompt retained more required source evidence
+overall at every tested budget. Neither Jev mode was strictly better than
+ordinary Catenator: both lost useful information in individual cases, and
+general Jev performed worse at the two larger budgets.
 
 These results support keeping general Jev optional. Prompted ranking helps
 with a known task, but file allocation and handling of large files still limit
@@ -46,6 +61,9 @@ Each snapshot was rendered at 6,000, 12,000, and 24,000 tokens in three modes:
 - **General Jev:** file scores from `jev-1.13.0`, without a task prompt.
 - **Jev + prompt:** general ratings followed by ratings for each task's
   instruction, using the general Jev document as context.
+
+Both Jev variants in this original comparison used full-source ranking input,
+now selected with `--full-source`.
 
 All modes used the same structural summaries, with `use_llm=False`. This
 isolates the effect of ranking and allocation. AI-generated file summaries
@@ -158,8 +176,8 @@ contains 12,520 source tokens, so it cannot fit verbatim into either smaller
 budget. Its structural summary supplies almost no implementation detail.
 Prompted download and upload outputs at 12,000 tokens used only 1,389 and
 2,085 tokens respectively and failed all eight associated checks. Both
-tasks passed at 24,000 tokens. Splitting files for Jev scoring does not
-currently provide partial source inclusion in the final output.
+tasks passed at 24,000 tokens. Splitting files for Jev scoring did not
+provide partial source inclusion in the final output.
 
 **A relevant file can still lose the budget competition.** The archive
 metadata prompt rated `audiobook_metadata.py` at 1.91, behind
@@ -207,9 +225,10 @@ the already-collected snapshot. Discovery and final rendering are excluded:
 | `bottom_audio_player` | 1.17 s | 0.90–0.98 s | 0.065–0.086 s |
 | `bunny_cdn` | 1.53 s | 1.31–1.40 s | 0.204–0.215 s |
 
-Cached general scoring took about 0.002 seconds for each project. Cached
-prompt scoring still builds and identifies its general context, which
-accounts for substantial local work on the larger archive project.
+Cached general scoring took about 0.002 seconds for each project. In the
+full-source pipeline, cached prompt scoring still builds and identifies its
+general context, which accounted for substantial local work on the larger
+archive project.
 
 ## Limits and audit trail
 
@@ -295,8 +314,8 @@ preparation but excluding discovery and final rendering, were:
 | `bottom_audio_player` | 0.91 s | 0.92 s |
 | `bunny_cdn` | 1.38 s | 0.93 s |
 
-Docstrings added cost without improving the measured task results. This
-tests the current extractor's first-line Python docstrings, not exhaustive
+Docstrings added cost without improving the measured task results in this
+first screen. It tested first-line Python docstrings rather than exhaustive
 documentation. The extractor also retains some JavaScript variable
 declarations and lacks Rust/CSS structural support, so these are practical
 existing outlines rather than complete language-independent skeletons.
@@ -307,9 +326,9 @@ responses. The comparison table charges each variant its standalone token
 usage, so reuse does not artificially lower the docstring option's cost.
 Muse QA costs are separate. All 108 compact outputs respected their budgets.
 
-This is a quick screen on the original cases, with no fresh-rating variance
-or held-out projects measured. Catenator's production ranking input has not
-been changed. [Compact-input results and usage](jev-compact-inputs-2026-09-18.json)
+This was a quick screen on the original cases, with no fresh-rating variance
+or held-out projects measured. The screen ran before outlines became the
+default. [Compact-input results and usage](jev-compact-inputs-2026-09-18.json)
 are preserved alongside the original benchmark data; full local receipts
 remain under `/tmp/catenator-jev-inputs-20260918/`.
 
@@ -381,7 +400,8 @@ of 1.5; full-source scoring gave it 1.14 and stripped outlines 1.48. That
 recovered two literal checks and one additional correct answer. Bell's
 callback task similarly raised `db.py` from 1.33 without docstrings to 1.58
 with them, retaining the implementation of shared callback deduplication.
-These threshold-sensitive examples warrant more runs before a default change.
+These examples depend on score thresholds; repeated fresh ratings would be
+needed to measure their stability.
 
 The equal general-context total of 7/36 at 12k also concealed a tradeoff:
 docstring outlines gained four Supervisor sluice facts and lost four Bell
@@ -438,14 +458,16 @@ report dollar charges, so QA cost is excluded from the Jev figures.
 All 108 comparative contexts passed independent token-budget and hash
 checks, and all 153 eligible source files still matched the frozen
 snapshot. The run completed in 5m24s with Bell job `58f8e037c785`; Bell
-made no monitoring-model requests. Catenator's production input mode was
-unchanged. [The durable results](jev-outline-holdout-2026-09-18.json) preserve
+made no monitoring-model requests. This comparison also preceded the default
+change. [The durable results](jev-outline-holdout-2026-09-18.json) preserve
 the cases, source hashes, usage, timing, output checks, relevant scores,
 paired differences, and reviewed QA answers. Complete local receipts and
 the harness are under `/tmp/catenator-jev-holdout-20260918/`.
 
-These additional projects favor docstring outlines as the stronger compact
-candidate, while full source remains strongest at the 12k budget in this
-run. This is one rating per project/task on selected Python-heavy projects,
-with no fresh-rating variance or code-change success measurement. The
-reversal between 12k and 24k makes a universal superiority claim premature.
+These additional projects favored docstring outlines among the compact
+inputs, while full source gave the best answer accuracy at the 12k budget
+in this run. Docstring outlines are now the default Jev input, with
+`--full-source` available for the full-source pipeline. This is one rating
+per project/task on selected Python-heavy projects, with no fresh-rating
+variance or code-change success measurement. The reversal between 12k and
+24k makes a universal superiority claim premature.
