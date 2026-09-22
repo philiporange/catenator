@@ -1,8 +1,8 @@
 """HTTP client and response validation for the Typesafe Jev API.
 
-This module provides the JevClient class for dispatching file scoring requests to
-the Typesafe Jev API endpoint, enforcing bearer authentication, strict request shape,
-and response structure validation including score bounds, confidence ranges, and token usage.
+This module dispatches scoring requests, distinguishes explicit context-limit
+responses from other sanitized HTTP failures, and validates successful response
+structure including score bounds, confidence ranges, and token usage.
 """
 
 import math
@@ -15,6 +15,34 @@ from .config import JevSettings
 
 class JevError(RuntimeError):
     """Raised when Jev requests fail or return invalid response data."""
+
+
+class JevContextError(JevError):
+    """Raised when Jev explicitly rejects a request for exceeding context limits."""
+
+
+_CONTEXT_ERROR_CODES = {
+    "context_length_exceeded",
+    "max_context_length_exceeded",
+    "max_tokens_exceeded",
+    "token_limit_exceeded",
+}
+
+
+def _is_context_error(data: Any) -> bool:
+    """Return whether a structured error object has an allowlisted context code."""
+    if not isinstance(data, dict):
+        return False
+
+    for field in ("error_type", "code", "type"):
+        value = data.get(field)
+        if isinstance(value, str) and value.lower() in _CONTEXT_ERROR_CODES:
+            return True
+
+    return any(
+        _is_context_error(data.get(field))
+        for field in ("detail", "error")
+    )
 
 
 class JevClient:
@@ -67,9 +95,29 @@ class JevClient:
                 f"Jev request network error: {type(exc).__name__}"
             ) from None
 
-        if response.status_code in (400, 413, 422):
+        if response.status_code == 413:
+            raise JevContextError(
+                "Jev request failed with HTTP 413: request exceeds Jev context limits"
+            )
+        if response.status_code in (400, 422):
+            try:
+                error_data = response.json()
+            except ValueError:
+                error_data = None
+
+            if _is_context_error(error_data):
+                raise JevContextError(
+                    f"Jev request failed with HTTP {response.status_code}: "
+                    "request exceeds Jev context limits"
+                )
+
+            guidance = (
+                "invalid request; check the request parameters"
+                if response.status_code == 400
+                else "request validation failed; check the schema and field values"
+            )
             raise JevError(
-                f"Jev request failed with HTTP {response.status_code}: check Jev context limits"
+                f"Jev request failed with HTTP {response.status_code}: {guidance}"
             )
         if response.status_code != 200:
             raise JevError(

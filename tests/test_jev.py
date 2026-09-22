@@ -1,8 +1,9 @@
-"""Verify outline and full-source Jev inputs, caching, budgets, and activation.
+"""Verify Jev inputs, adaptive context recovery, caching, budgets, and activation.
 
 An in-memory scorer returns controlled per-file answers while retaining each
 request for inspection. Tests exercise real discovery and rendering without
-network access or writes to the user's score cache.
+network access or writes to the user's score cache, including server rejections
+that require question or evidence subdivision.
 """
 
 import copy
@@ -16,7 +17,7 @@ import pytest
 from src.catenator import Catenator, jev
 from src.catenator.catenator import CatenatorEventHandler, main
 from src.catenator.config import JevSettings
-from src.catenator.jev_client import JevError
+from src.catenator.jev_client import JevContextError, JevError
 
 
 @pytest.fixture
@@ -612,3 +613,229 @@ def test_cli_full_source_implicitly_enables_jev_and_allows_refresh(project, monk
     assert len(project.calls) == (2 if prompt else 1)
     if prompt:
         assert "general_project_context" in project.calls[1]["state"]
+
+
+def test_context_rejection_splits_questions_once_and_caches_complete_scores(
+    project, monkeypatch
+):
+    for index in range(7):
+        write(project, f"module_{index}.py", f"VALUE = {index}\n")
+    successful_evaluate = jev.JevClient.evaluate
+    attempts = []
+
+    def reject_multiple(client, state, questions):
+        attempts.append(copy.deepcopy((state, questions)))
+        if len(questions) > 1:
+            raise JevContextError("context limit")
+        return successful_evaluate(client, state, questions)
+
+    monkeypatch.setattr(jev.JevClient, "evaluate", reject_multiple)
+    cat = catenator(project)
+    cat.catenate(use_jev=True)
+
+    assert set(cat.last_jev_scores["general"]) == set(project.general)
+    assert len({jev._json(attempt) for attempt in attempts}) == len(attempts)
+    report = cat.last_jev_report[0]
+    assert report["requests"] == len(project.general)
+    assert report["input_tokens"] == 1234 * len(project.general)
+    assert report["context_splits"] == len(project.general) - 1
+
+    attempt_count = len(attempts)
+    cat.catenate(use_jev=True)
+    assert len(attempts) == attempt_count
+    assert cat.last_jev_report[0]["cache_hit"]
+
+
+def test_runtime_context_rejection_splits_unicode_source_without_loss(
+    project, monkeypatch
+):
+    content = "prefix🌍漢字\n" + "".join(f"row {index}: café 🚀\n" for index in range(80))
+    write(project, "large.py", content)
+    successful_evaluate = jev.JevClient.evaluate
+    attempts = []
+
+    def reject_large_source(client, state, questions):
+        attempts.append(copy.deepcopy((state, questions)))
+        source = state["source_files"][0]
+        if len(source["content"]) > 180:
+            raise JevContextError("context limit")
+        return successful_evaluate(client, state, questions)
+
+    project.score_part = lambda state, path, score: (
+        2.0 if state["source_files"][0]["start_character"] else 0.0
+    )
+    monkeypatch.setattr(jev.JevClient, "evaluate", reject_large_source)
+    cat = catenator(project)
+    cat.catenate(jev_full_source=True)
+
+    successful_parts = [
+        entry
+        for call in project.calls
+        for entry in call["state"]["source_files"]
+    ]
+    assert "".join(
+        part["content"]
+        for part in sorted(successful_parts, key=lambda part: part["start_character"])
+    ) == content
+    assert any(part["start_character"] > 0 for part in successful_parts)
+    assert cat.last_jev_scores["general"]["large.py"]["score"] == 2.0
+    assert len(attempts) > len(project.calls)
+
+
+def test_full_source_prompt_rejection_splits_context_and_preserves_question(
+    project, monkeypatch
+):
+    for index in range(4):
+        write(
+            project,
+            f"module_{index}.py",
+            f'def value_{index}():\n    return "BODY_{index}"\n',
+        )
+    query = "Explain every value function"
+    project.queries[query] = dict(project.general)
+    successful_evaluate = jev.JevClient.evaluate
+    rejected = []
+
+    def reject_large_prompt_context(client, state, questions):
+        context = state.get("general_project_context")
+        if context is not None and len(context) > 120:
+            rejected.append(copy.deepcopy((state, questions)))
+            raise JevContextError("context limit")
+        return successful_evaluate(client, state, questions)
+
+    monkeypatch.setattr(jev.JevClient, "evaluate", reject_large_prompt_context)
+    cat = catenator(project)
+    cat.catenate(prompt=query, jev_full_source=True)
+
+    prompt_calls = [call for call in project.calls if call["state"].get("query")]
+    assert rejected and prompt_calls
+    expected_questions = rejected[0][1]
+    assert all(call["state"]["query"] == query for call in prompt_calls)
+    assert {
+        question_id
+        for call in prompt_calls
+        for question_id in call["questions"]
+    } == set(expected_questions)
+    assert all(
+        question == expected_questions[question_id]
+        for call in prompt_calls
+        for question_id, question in call["questions"].items()
+    )
+    for question_id in expected_questions:
+        assert "".join(
+            call["state"]["general_project_context"]
+            for call in prompt_calls
+            if question_id in call["questions"]
+        ) == rejected[0][0]["general_project_context"]
+    assert set(cat.last_jev_scores["prompt"]) == set(project.general)
+
+
+def test_persistent_context_rejection_is_bounded_and_does_not_cache(
+    project, monkeypatch
+):
+    write(project, "main.py", "def main():\n    return 1\n")
+    monkeypatch.setattr(jev, "JEV_MAX_CONTEXT_SPLITS", 2)
+    successful_evaluate = jev.JevClient.evaluate
+    attempts = []
+
+    def reject_all(client, state, questions):
+        attempts.append(copy.deepcopy((state, questions)))
+        raise JevContextError("context limit")
+
+    monkeypatch.setattr(jev.JevClient, "evaluate", reject_all)
+    cat = catenator(project)
+    with pytest.raises(JevError, match="after splitting"):
+        cat.catenate(use_jev=True)
+    assert len(attempts) == 3
+    assert not list(jev.JEV_CACHE_DIR.glob("**/*.json"))
+
+    monkeypatch.setattr(jev.JevClient, "evaluate", successful_evaluate)
+    cat.catenate(use_jev=True)
+    assert project.calls
+
+
+def test_generic_jev_error_propagates_without_subdivision(project, monkeypatch):
+    write(project, "main.py", "def main():\n    return 1\n")
+    attempts = []
+
+    def fail(client, state, questions):
+        attempts.append((state, questions))
+        raise JevError("invalid request")
+
+    monkeypatch.setattr(jev.JevClient, "evaluate", fail)
+    with pytest.raises(JevError, match="invalid request"):
+        catenator(project).catenate(use_jev=True)
+    assert len(attempts) == 1
+    assert not list(jev.JEV_CACHE_DIR.glob("**/*.json"))
+
+
+@pytest.mark.parametrize("limiting_field", ["JEV_PAIR_TOKEN_LIMIT", "JEV_REQUEST_TOKEN_LIMIT"])
+def test_single_request_budget_splits_file_evidence_and_scores_it(
+    project, monkeypatch, limiting_field
+):
+    content = "".join(f'line_{index} = "漢字 {index}"\n' for index in range(300))
+    write(project, "large.py", content)
+    monkeypatch.setattr(jev, "JEV_STATE_TOKEN_LIMIT", 20_000)
+    monkeypatch.setattr(jev, "JEV_REQUEST_TOKEN_LIMIT", 20_000)
+    monkeypatch.setattr(jev, "JEV_PAIR_TOKEN_LIMIT", 20_000)
+    monkeypatch.setattr(jev, limiting_field, 900)
+    cat = catenator(project)
+    cat.catenate(jev_full_source=True)
+
+    parts = [
+        entry
+        for call in project.calls
+        for entry in call["state"]["source_files"]
+    ]
+    assert len(parts) > 1
+    assert "".join(
+        part["content"]
+        for part in sorted(parts, key=lambda part: part["start_character"])
+    ) == content
+    assert set(cat.last_jev_scores["general"]) == {"large.py"}
+    assert all(cat.count_tokens(jev._json(call)) <= 900 for call in project.calls)
+
+
+def test_outline_prompt_recovery_preserves_query_and_all_outline_characters(
+    project, monkeypatch
+):
+    for file_index in range(2):
+        content = "\n\n".join(
+            f"def action_{file_index}_{item}(value: str) -> str:\n"
+            f'    """Document action {file_index} {item}."""\n'
+            f'    return "BODY_{file_index}_{item}"\n'
+            for item in range(12)
+        )
+        write(project, f"module_{file_index}.py", content)
+    query = "Explain the documented actions"
+    project.queries[query] = dict(project.general)
+    successful_evaluate = jev.JevClient.evaluate
+    initial_query_state = []
+
+    def reject_large_outlines(client, state, questions):
+        if state.get("query") == query:
+            if not initial_query_state:
+                initial_query_state.append(copy.deepcopy(state))
+            if len(questions) > 1 or any(
+                len(entry["content"]) > 140
+                for entry in state["source_files"]
+            ):
+                raise JevContextError("context limit")
+        return successful_evaluate(client, state, questions)
+
+    monkeypatch.setattr(jev.JevClient, "evaluate", reject_large_outlines)
+    cat = catenator(project)
+    cat.catenate(prompt=query)
+
+    prompt_calls = [call for call in project.calls if call["state"].get("query")]
+    expected = {
+        entry["path"]: entry["content"]
+        for entry in initial_query_state[0]["source_files"]
+    }
+    actual = {path: "" for path in expected}
+    for call in prompt_calls:
+        assert call["state"]["query"] == query
+        entry = call["state"]["source_files"][0]
+        actual[entry["path"]] += entry["content"]
+    assert actual == expected
+    assert set(cat.last_jev_scores["prompt"]) == set(project.general)

@@ -279,15 +279,21 @@ allow full source. The overview and directory tree can still mention omitted
 files. `--token-limit` can further reduce or omit files to fit the output.
 Without a token limit, the score's inclusion decision still applies.
 
-For larger projects, scoring input is packed into roughly 28,000-token states
+For larger projects, scoring input is packed into roughly 24,000-token states
 with a shared overview built from that same input representation. A query's
 space is reserved in each outline batch before packing. Inputs exceeding a
 state are split without dropping characters; their highest part score
 determines inclusion. Every file is evaluated, but each judgment sees only
 its batch plus shared project context. Request packing also budgets
-question text: up to 30,000 estimated tokens for state plus one question and
-60,000 for state plus all questions. These counts use `cl100k_base` and leave
-headroom for Jev's different tokenizer. API size errors are reported clearly.
+question text: up to 26,000 estimated tokens for state plus one question and
+48,000 for state plus all questions. These counts use `cl100k_base` and reserve
+headroom for Jev's different tokenizer and question framing. If Jev still
+rejects the size, Catenator splits the questions, then reduces shared context
+and splits candidate text as needed. Candidate text keeps every character,
+the query remains intact, and the highest part score determines inclusion.
+Recovery stops after 12 subdivisions along a failing branch and reports an
+actionable error if the query or metadata cannot fit. Other API failures are
+reported separately and do not trigger size recovery.
 
 `--prompt` enables Jev automatically. Catenator obtains or reuses general
 ratings, then scores all candidate outlines with docstrings directly against
@@ -295,7 +301,7 @@ the query. Query ratings are independent of general importance, so a
 generally ignored file can still be selected for a specific task.
 
 With `--full-source`, prompt scoring builds a general Jev source document
-with a high context budget (up to approximately 27,000 tokens, reserving
+with a high context budget (up to approximately 23,000 tokens, reserving
 space for the query and formatting). Each query question also includes a
 bounded structural description of its candidate, including candidates absent
 from the general document. Final output uses the original source and prompt
@@ -334,9 +340,12 @@ the estimated USD price per million input tokens.
 
 Each fresh pass prints its input mode, request count, actual API-reported input
 tokens, and estimated USD cost to stderr. The context document remains on
-stdout. Cache hits report no new API cost. Failed requests are not retried
-automatically. Only successfully validated responses contribute to the usage report;
-provider billing may include a request whose response could not be read.
+stdout. Cache hits report no new API cost. Confirmed context-limit failures
+are subdivided into smaller requests; identical failed requests and unrelated
+errors are not retried automatically. `context_splits` records these recovery
+steps in each pass's report. Only successfully validated responses contribute
+to the usage report; provider billing may include a request whose response
+could not be read.
 
 At the configured default estimate of **$0.042 per million input tokens**,
 these are example costs across all batches of a pass. The estimate uses

@@ -2,8 +2,8 @@
 
 This test suite verifies the JevClient request shape, header and authentication
 handling, payload structure with explicit per-file paths in question instructions,
-safe handling of network/HTTP errors without credential leakage, strict response
-validation, and environment precedence/isolation across configurations.
+safe and precise classification of HTTP errors without credential leakage, strict
+response validation, and environment precedence/isolation across configurations.
 """
 
 from pathlib import Path
@@ -17,7 +17,7 @@ from src.catenator.config import (
     JevSettings,
     get_jev_settings,
 )
-from src.catenator.jev_client import JevClient, JevError
+from src.catenator.jev_client import JevClient, JevContextError, JevError
 
 
 THREE_LEVEL_CRITERIA = [
@@ -154,27 +154,94 @@ def test_empty_questions_refusal() -> None:
     assert mock_session.post.call_count == 0
 
 
-@pytest.mark.parametrize("status_code", [400, 413, 422])
-def test_http_context_limits_errors(status_code: int) -> None:
+@pytest.mark.parametrize(
+    ("status_code", "body"),
+    [
+        (400, {"detail": {"error_type": "max_tokens_exceeded"}}),
+        (400, {"error": {"code": "context_length_exceeded"}}),
+        (422, {"detail": {"type": "max_context_length_exceeded"}}),
+        (422, {"error": {"error_type": "token_limit_exceeded"}}),
+    ],
+)
+def test_structured_http_context_limit_errors(status_code: int, body: dict) -> None:
     mock_session = MagicMock(spec=requests.Session)
     mock_response = MagicMock()
     mock_response.status_code = status_code
-    mock_response.text = "Error detail: payload context exceeded"
+    mock_response.json.return_value = body
     mock_session.post.return_value = mock_response
 
     key = "secret-credential-should-not-leak"
     settings = JevSettings(api_key=key)
     client = JevClient(settings, session=mock_session)
 
-    with pytest.raises(JevError) as exc_info:
+    with pytest.raises(JevContextError) as exc_info:
         client.evaluate("state", _build_sample_questions())
 
     msg = str(exc_info.value)
     assert f"HTTP {status_code}" in msg
-    assert "check Jev context limits" in msg
+    assert "context limits" in msg
     assert key not in msg
     assert "https://" not in msg
-    assert "payload context exceeded" not in msg
+    assert mock_session.post.call_count == 1
+
+
+def test_http_413_is_context_error_without_parsing_body() -> None:
+    mock_session = MagicMock(spec=requests.Session)
+    mock_response = MagicMock()
+    mock_response.status_code = 413
+    mock_response.json.side_effect = ValueError("secret response")
+    mock_session.post.return_value = mock_response
+
+    client = JevClient(JevSettings(api_key="secret-key"), session=mock_session)
+    with pytest.raises(JevContextError, match="HTTP 413"):
+        client.evaluate("state", _build_sample_questions())
+
+    mock_response.json.assert_not_called()
+    assert mock_session.post.call_count == 1
+
+
+@pytest.mark.parametrize(
+    ("status_code", "body", "guidance"),
+    [
+        (400, {"detail": "context_length_exceeded"}, "invalid request"),
+        (400, {"source": {"type": "max_tokens_exceeded"}}, "invalid request"),
+        (422, {"input": {"code": "token_limit_exceeded"}}, "request validation"),
+        (422, ["max_context_length_exceeded"], "request validation"),
+    ],
+)
+def test_context_looking_unstructured_errors_remain_generic(
+    status_code: int, body: object, guidance: str
+) -> None:
+    mock_session = MagicMock(spec=requests.Session)
+    mock_response = MagicMock()
+    mock_response.status_code = status_code
+    mock_response.json.return_value = body
+    mock_session.post.return_value = mock_response
+
+    client = JevClient(JevSettings(api_key="secret-key"), session=mock_session)
+    with pytest.raises(JevError) as exc_info:
+        client.evaluate("state", _build_sample_questions())
+
+    assert not isinstance(exc_info.value, JevContextError)
+    assert guidance in str(exc_info.value)
+    assert "max_tokens_exceeded" not in str(exc_info.value)
+
+
+@pytest.mark.parametrize("status_code", [400, 422])
+def test_invalid_json_error_response_remains_generic(status_code: int) -> None:
+    mock_session = MagicMock(spec=requests.Session)
+    mock_response = MagicMock()
+    mock_response.status_code = status_code
+    mock_response.json.side_effect = ValueError("invalid JSON with secret-key")
+    mock_session.post.return_value = mock_response
+
+    client = JevClient(JevSettings(api_key="secret-key"), session=mock_session)
+    with pytest.raises(JevError) as exc_info:
+        client.evaluate("state", _build_sample_questions())
+
+    assert not isinstance(exc_info.value, JevContextError)
+    assert "secret-key" not in str(exc_info.value)
+    assert mock_session.post.call_count == 1
 
 
 def test_http_generic_error_sanitization() -> None:

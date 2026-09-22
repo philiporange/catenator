@@ -4,8 +4,10 @@ Scoring uses bounded outlines with docstrings by default, adding the query
 directly to that context for task ratings. Optional full-source scoring batches
 all file contents and uses a generous general-score rendering for queries.
 Large inputs are split without dropping characters and keep their highest
-part score. General ratings persist by path with a short hash of the actual
-source; only new paths are scored until explicitly refreshed. Input modes have
+part score. Confirmed API context rejections trigger bounded subdivision of
+questions or evidence; unrelated errors fail immediately. General ratings
+persist by path with a short hash of the actual source; only new paths are
+scored until explicitly refreshed. Input modes have
 separate caches, and query caches track current source contents. Each pass
 reports its input mode, fresh token usage, and estimated dollar cost.
 """
@@ -20,12 +22,13 @@ import sys
 import tempfile
 
 from .config import (
+    JEV_MAX_CONTEXT_SPLITS,
     JEV_PAIR_TOKEN_LIMIT,
     JEV_REQUEST_TOKEN_LIMIT,
     JEV_STATE_TOKEN_LIMIT,
     get_jev_settings,
 )
-from .jev_client import JevClient, JevError
+from .jev_client import JevClient, JevContextError, JevError
 from .rendering import render_project
 from .summarizer import extract_signatures
 
@@ -141,6 +144,82 @@ def _general_states(cat, files, query=None, full_source=True):
     return states
 
 
+def _split_request(state, questions, targets):
+    """Reduce a rejected request while preserving its query and candidate text."""
+    if len(questions) > 1:
+        keys = list(questions)
+        middle = len(keys) // 2
+        return [
+            (
+                state,
+                {key: questions[key] for key in group},
+                {key: targets[key] for key in group},
+            )
+            for group in (keys[:middle], keys[middle:])
+        ]
+
+    if "source_files" in state:
+        entries = state["source_files"]
+        relevant = [
+            entry for entry in entries if entry["path"] in targets.values()
+        ]
+        if relevant and len(relevant) < len(entries):
+            return [({**state, "source_files": relevant}, questions, targets)]
+        if state.get("project_context"):
+            reduced = {
+                key: value for key, value in state.items()
+                if key != "project_context"
+            }
+            return [(reduced, questions, targets)]
+        if len(entries) > 1:
+            middle = len(entries) // 2
+            return [
+                ({**state, "source_files": group}, questions, targets)
+                for group in (entries[:middle], entries[middle:])
+            ]
+        if entries and len(entries[0]["content"]) > 1:
+            entry = entries[0]
+            content = entry["content"]
+            middle = len(content) // 2
+            parts = []
+            for offset, text in (
+                (0, content[:middle]), (middle, content[middle:])
+            ):
+                part = {**entry, "content": text}
+                if "start_character" in entry:
+                    part["start_character"] += offset
+                parts.append(
+                    ({**state, "source_files": [part]}, questions, targets)
+                )
+            return parts
+
+    context = state.get("general_project_context", "")
+    if len(context) > 1:
+        middle = len(context) // 2
+        return [
+            ({**state, "general_project_context": part}, questions, targets)
+            for part in (context[:middle], context[middle:])
+        ]
+    raise JevError(
+        "Jev context cannot be reduced further; shorten the query or file "
+        "metadata, or reduce the selected project scope."
+    )
+
+
+def _fit_pair(cat, state, questions, targets, model):
+    """Split evidence when even a single question exceeds a local input budget."""
+    pending = [(state, questions, targets)]
+    while pending:
+        state, questions, targets = pending.pop()
+        cost = cat.count_tokens(
+            _json({"model": model, "state": state, "questions": questions})
+        )
+        if cost <= min(JEV_PAIR_TOKEN_LIMIT, JEV_REQUEST_TOKEN_LIMIT):
+            yield state, questions, targets
+        else:
+            pending.extend(reversed(_split_request(state, questions, targets)))
+
+
 def _requests(cat, states, files, model, prompt=False, full_source=False):
     """Batch questions as well as source, counting their full serialized input."""
     by_path = {path: content for path, _, content in files}
@@ -176,10 +255,16 @@ def _requests(cat, states, files, model, prompt=False, full_source=False):
             if cost({question_id: question}) > min(
                 JEV_PAIR_TOKEN_LIMIT, JEV_REQUEST_TOKEN_LIMIT
             ):
-                raise JevError(
-                    "Jev state plus a file question exceeds its context budget; "
-                    "shorten the query or reduce the selected project scope."
+                if questions:
+                    requests.append((state, questions, targets))
+                    questions, targets = {}, {}
+                requests.extend(
+                    _fit_pair(
+                        cat, state, {question_id: question},
+                        {question_id: path}, model,
+                    )
                 )
+                continue
             if (
                 questions
                 and cost({**questions, question_id: question})
@@ -281,6 +366,7 @@ def _run_pass(
         "cached_files": len(cached) if cached is not None else cached_files,
         "scored_files": 0,
         "requests": 0,
+        "context_splits": 0,
         "input_tokens": 0,
         "estimated_cost_usd": 0.0,
         "model": client.settings.model,
@@ -296,8 +382,29 @@ def _run_pass(
 
     scores = {}
     try:
-        for state, questions, targets in requests:
-            response = client.evaluate(state, questions)
+        pending = [(*request, 0) for request in reversed(requests)]
+        while pending:
+            state, questions, targets, depth = pending.pop()
+            try:
+                response = client.evaluate(state, questions)
+            except JevContextError:
+                if depth >= JEV_MAX_CONTEXT_SPLITS:
+                    raise JevError(
+                        "Jev context still exceeds the API limit after splitting; "
+                        "shorten the query or reduce the selected project scope."
+                    ) from None
+                smaller = _split_request(state, questions, targets)
+                if not report["context_splits"]:
+                    print(
+                        "Jev context limit: splitting rejected input "
+                        "into smaller requests.",
+                        file=sys.stderr,
+                    )
+                report["context_splits"] += 1
+                pending.extend(
+                    (*request, depth + 1) for request in reversed(smaller)
+                )
+                continue
             report["requests"] += 1
             report["input_tokens"] += response["usage"]["input_tokens"]
             report["model"] = response["model"]
