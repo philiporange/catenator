@@ -1,7 +1,8 @@
 """Verify Jev inputs, adaptive context recovery, caching, budgets, and activation.
 
 An in-memory scorer returns controlled per-file answers while retaining each
-request for inspection. Tests exercise real discovery and rendering without
+request for inspection. Tests exercise shared-rubric packing, incremental prompt
+caches, run-wide spending limits, real discovery, and rendering without
 network access or writes to the user's score cache, including server rejections
 that require question or evidence subdivision.
 """
@@ -189,7 +190,7 @@ def test_question_batches_fit_complete_requests_and_score_every_file(
     project, monkeypatch
 ):
     monkeypatch.setattr(jev, "JEV_REQUEST_TOKEN_LIMIT", 2500)
-    for i in range(16):
+    for i in range(48):
         write(
             project, f"module_{i}.py", f"def action_{i}():\n    return {i}\n"
         )
@@ -227,20 +228,22 @@ def test_prompt_promotes_ignored_files_and_reuses_general_cache(project, full_so
         use_jev=True, prompt=query, token_limit=1000, jev_full_source=full_source
     )
     assert "RARE_BODY" in output and "CORE_BODY" not in output
-    assert "query" not in project.calls[0]["state"]
-    assert project.calls[1]["state"]["query"] == query
+    query_call = project.calls[-1]
+    assert query_call["state"]["query"] == query
     if full_source:
+        assert "query" not in project.calls[0]["state"]
         assert (
-            "# rare.py" not in project.calls[1]["state"]["general_project_context"]
+            "# rare.py" not in query_call["state"]["general_project_context"]
         )
     else:
-        assert "general_project_context" not in project.calls[1]["state"]
-        assert {e["path"] for e in project.calls[1]["state"]["source_files"]} == {
+        assert "general" not in cat.last_jev_scores
+        assert "general_project_context" not in query_call["state"]
+        assert {e["path"] for e in query_call["state"]["source_files"]} == {
             "core.py", "rare.py"
         }
         assert "CORE_BODY" not in json.dumps(project.calls)
         assert "RARE_BODY" not in json.dumps(project.calls)
-    assert len(project.calls[1]["questions"]) == 2
+    assert len(query_call["questions"]) == 2
     for report in cat.last_jev_report:
         assert report["input_tokens"] == 1234
         assert report["estimated_cost_usd"] == pytest.approx(
@@ -249,7 +252,8 @@ def test_prompt_promotes_ignored_files_and_reuses_general_cache(project, full_so
     assert cat.catenate(
         use_jev=True, prompt=query, token_limit=1000, jev_full_source=full_source
     ) == output
-    assert len(project.calls) == 2
+    passes = 2 if full_source else 1
+    assert len(project.calls) == passes
     assert all(
         report["cache_hit"]
         and report["input_tokens"] == 0
@@ -259,11 +263,10 @@ def test_prompt_promotes_ignored_files_and_reuses_general_cache(project, full_so
     cat.catenate(
         use_jev=True, prompt="Explain the core", jev_full_source=full_source
     )
-    assert len(project.calls) == 3
-    assert [report["cache_hit"] for report in cat.last_jev_report] == [
-        True,
-        False,
-    ]
+    assert len(project.calls) == passes + 1
+    assert [report["cache_hit"] for report in cat.last_jev_report] == (
+        [True, False] if full_source else [False]
+    )
 
 
 @pytest.mark.parametrize("change", ["edit", "rename", "delete"])
@@ -275,7 +278,7 @@ def test_source_changes_refresh_prompt_but_only_new_paths_need_general_scores(
         project, "unused.py", 'def feature():\n    return "old"\n', 0.0
     )
     cat = catenator(project)
-    cat.catenate(use_jev=True, prompt="Describe the entry point")
+    cat.catenate(jev_full_source=True, prompt="Describe the entry point")
     if change == "edit":
         target.write_text('def feature():\n    return "new"\n')
     elif change == "rename":
@@ -284,7 +287,7 @@ def test_source_changes_refresh_prompt_but_only_new_paths_need_general_scores(
     else:
         target.unlink()
         del project.general["unused.py"]
-    cat.catenate(use_jev=True, prompt="Describe the entry point")
+    cat.catenate(jev_full_source=True, prompt="Describe the entry point")
     assert len(project.calls) == (4 if change == "rename" else 3)
     assert cat.last_jev_report[0]["cache_hit"] == (change != "rename")
     assert not cat.last_jev_report[1]["cache_hit"]
@@ -362,7 +365,7 @@ def test_changing_filters_retains_general_ratings(project):
     assert set(cat.last_jev_scores["general"]) == {"main.py", "guide.md"}
 
 
-def test_prompt_alone_triggers_both_stages_and_query_selection(project):
+def test_outline_prompt_skips_unused_general_scoring(project):
     write(project, "core.py", 'def core():\n    return "CORE_BODY"\n')
     write(
         project,
@@ -375,9 +378,10 @@ def test_prompt_alone_triggers_both_stages_and_query_selection(project):
     cat = catenator(project)
     output = cat.catenate(prompt=query, token_limit=1000)
     assert "RARE_BODY" in output and "CORE_BODY" not in output
-    assert len(project.calls) == 2
-    assert "query" not in project.calls[0]["state"]
-    assert project.calls[1]["state"]["query"] == query
+    assert len(project.calls) == 1
+    assert project.calls[0]["state"]["query"] == query
+    assert set(cat.last_jev_scores) == {"prompt"}
+    assert not list(jev.JEV_CACHE_DIR.glob("*/general*.json"))
 
 
 def test_cli_prompt_alone_and_refresh_accepted(project, monkeypatch, capsys):
@@ -405,8 +409,8 @@ def test_cli_prompt_alone_and_refresh_accepted(project, monkeypatch, capsys):
     main()
     out = capsys.readouterr().out
     assert "RARE_BODY" in out and "CORE_BODY" not in out
-    assert len(project.calls) == 2
-    assert project.calls[1]["state"]["query"] == query
+    assert len(project.calls) == 1
+    assert project.calls[0]["state"]["query"] == query
 
     monkeypatch.setattr(
         sys,
@@ -422,7 +426,7 @@ def test_cli_prompt_alone_and_refresh_accepted(project, monkeypatch, capsys):
         ],
     )
     main()
-    assert len(project.calls) == 4
+    assert len(project.calls) == 2
 
     monkeypatch.setattr(
         sys,
@@ -438,7 +442,7 @@ def test_cli_prompt_alone_and_refresh_accepted(project, monkeypatch, capsys):
         ],
     )
     main()
-    assert len(project.calls) == 4
+    assert len(project.calls) == 2
 
 
 @pytest.mark.parametrize(
@@ -448,6 +452,7 @@ def test_cli_prompt_alone_and_refresh_accepted(project, monkeypatch, capsys):
         ["--prompt", "  "],
         ["--jev", "--prompt", "  "],
         ["--refresh-scores"],
+        ["--jev-token-limit", "-1"],
     ],
 )
 def test_cli_rejects_invalid_jev_options_before_requests(
@@ -467,6 +472,9 @@ def test_cli_rejects_invalid_jev_options_before_requests(
         {"prompt": "  "},
         {"use_jev": True, "prompt": "  "},
         {"refresh_scores": True},
+        {"jev_token_limit": -1},
+        {"jev_token_limit": 1.5},
+        {"jev_token_limit": True},
     ],
 )
 def test_catenate_rejects_invalid_jev_options_before_requests(project, kwargs):
@@ -568,16 +576,16 @@ def test_input_modes_keep_separate_general_and_prompt_caches(project):
     outlines = cat.catenate(prompt=query)
     project.general["main.py"] = 0.0
     full = cat.catenate(prompt=query, jev_full_source=True)
-    assert len(project.calls) == 4
+    assert len(project.calls) == 3
     assert "SOURCE_BODY" in outlines and "SOURCE_BODY" not in full
     assert cat.catenate(prompt=query) == outlines
     assert cat.catenate(prompt=query, jev_full_source=True) == full
-    assert len(project.calls) == 4
+    assert len(project.calls) == 3
     project.general["main.py"] = 2.0
     cat.catenate(prompt=query, jev_full_source=True, refresh_scores=True)
-    assert len(project.calls) == 6
+    assert len(project.calls) == 5
     assert cat.catenate(prompt=query) == outlines
-    assert len(project.calls) == 6
+    assert len(project.calls) == 5
     assert all(r["cache_hit"] for r in cat.last_jev_report)
 
 
@@ -839,3 +847,142 @@ def test_outline_prompt_recovery_preserves_query_and_all_outline_characters(
         actual[entry["path"]] += entry["content"]
     assert actual == expected
     assert set(cat.last_jev_scores["prompt"]) == set(project.general)
+
+
+def test_joint_packing_sends_each_outline_once(project, monkeypatch):
+    monkeypatch.setattr(jev, "JEV_REQUEST_TOKEN_LIMIT", 1200)
+    for index in range(40):
+        write(project, f"module_{index:02}.py", f"def action_{index}():\n    return 1\n")
+    cat = catenator(project)
+    cat.catenate(prompt="Explain these actions")
+    sent = [
+        entry["path"] for call in project.calls
+        for entry in call["state"]["source_files"]
+    ]
+    assert len(project.calls) > 1
+    assert sorted(sent) == sorted(project.general)
+    for call in project.calls:
+        assert cat.count_tokens(jev._json(call)) <= 1200
+        assert call["state"]["scoring_rubric"] == jev.SCORING_RUBRIC
+        assert all("scoring_rubric" in q["instructions"] for q in call["questions"].values())
+
+
+def test_prompt_edit_reuses_other_batches_but_hashes_actual_source(project, monkeypatch):
+    monkeypatch.setattr(jev, "JEV_REQUEST_TOKEN_LIMIT", 1200)
+    for index in range(30):
+        write(project, f"module_{index:02}.py", f"def action_{index}():\n    return 1\n")
+    cat = catenator(project)
+    query = "Explain these actions"
+    cat.catenate(prompt=query)
+    initial = list(project.calls)
+    assert len(initial) > 1
+    target = initial[-1]["state"]["source_files"][-1]["path"]
+    path = project.root / target
+    path.write_text(path.read_text().replace("return 1", "return 2"))
+    project.calls.clear()
+    output = cat.catenate(prompt=query)
+    assert "return 2" in output
+    assert len(project.calls) == 1
+    assert project.calls[0] == initial[-1]
+    report = cat.last_jev_report[0]
+    assert report["scored_files"] == len(initial[-1]["questions"])
+    assert report["cached_files"] + report["scored_files"] == len(project.general)
+    assert set(cat.last_jev_scores["prompt"]) == set(project.general)
+    cat.catenate(prompt=query)
+    assert len(project.calls) == 1
+    assert cat.last_jev_report[0]["cache_hit"]
+    cat.catenate(prompt=query, refresh_scores=True)
+    assert len(project.calls) == 1 + len(initial)
+
+
+def test_completed_prompt_batches_survive_later_failure(project, monkeypatch):
+    monkeypatch.setattr(jev, "JEV_REQUEST_TOKEN_LIMIT", 1200)
+    for index in range(30):
+        write(project, f"module_{index:02}.py", f"def action_{index}():\n    return 1\n")
+    successful_evaluate = jev.JevClient.evaluate
+
+    def fail_second(client, state, questions):
+        if project.calls:
+            raise JevError("network failed")
+        return successful_evaluate(client, state, questions)
+
+    monkeypatch.setattr(jev.JevClient, "evaluate", fail_second)
+    cat = catenator(project)
+    with pytest.raises(JevError, match="network failed"):
+        cat.catenate(prompt="Explain actions")
+    completed = project.calls[0]
+    monkeypatch.setattr(jev.JevClient, "evaluate", successful_evaluate)
+    cat.catenate(prompt="Explain actions")
+    assert all(call != completed for call in project.calls[1:])
+    assert cat.last_jev_report[0]["cached_files"] == len(completed["questions"])
+    assert set(cat.last_jev_scores["prompt"]) == set(project.general)
+
+
+@pytest.mark.parametrize("kwargs", [{"use_jev": True}, {"prompt": "Explain main"}])
+def test_input_budget_preflight_prevents_all_api_calls(project, kwargs):
+    write(project, "main.py", "def main():\n    return 1\n")
+    cat = catenator(project)
+    with pytest.raises(JevError, match="--token-limit only limits the output"):
+        cat.catenate(jev_token_limit=1, **kwargs)
+    assert project.calls == []
+    assert not list(jev.JEV_CACHE_DIR.glob("**/*.json"))
+    cat.catenate(jev_token_limit=0, **kwargs)
+    assert project.calls
+    cat.catenate(jev_token_limit=1, **kwargs)
+    assert cat.last_jev_report[0]["cache_hit"]
+    assert cat.last_jev_report[0]["input_tokens"] == 0
+
+
+def test_full_source_budget_is_shared_between_stages(project):
+    write(project, "main.py", "def main():\n    return 1\n")
+    with pytest.raises(JevError, match="1,234 tokens already accounted"):
+        catenator(project).catenate(
+            prompt="Explain main", jev_full_source=True, jev_token_limit=1400,
+        )
+    assert len(project.calls) == 1
+    assert "query" not in project.calls[0]["state"]
+
+
+def test_context_recovery_consumes_input_budget(project, monkeypatch):
+    write(project, "main.py", "def main():\n    return 1\n")
+    attempts = []
+
+    def reject(client, state, questions):
+        attempts.append((state, questions))
+        raise JevContextError("too big")
+
+    monkeypatch.setattr(jev.JevClient, "evaluate", reject)
+    cat = catenator(project)
+    with pytest.raises(JevError, match="input budget exceeded"):
+        cat.catenate(prompt="Explain main", jev_token_limit=450)
+    assert 1 <= len(attempts) <= 2
+    assert not list(jev.JEV_CACHE_DIR.glob("**/*.json"))
+
+
+def test_cli_budget_guard_preserves_output_file(project, monkeypatch, capsys):
+    write(project, "main.py", "def main():\n    return 1\n")
+    output = project.root / "context.md"
+    output.write_text("previous output")
+    monkeypatch.setattr(sys, "argv", [
+        "catenator", str(project.root), "--prompt", "Explain main",
+        "--jev-token-limit", "1", "--output", str(output),
+    ])
+    with pytest.raises(SystemExit) as error:
+        main()
+    assert error.value.code == 1
+    assert "input budget exceeded" in capsys.readouterr().err
+    assert project.calls == []
+    assert output.read_text() == "previous output"
+
+
+def test_watch_retains_input_budget(project, capsys):
+    write(project, "main.py", "def main():\n    return 1\n")
+    output = project.root / "context.md"
+    output.write_text("previous output")
+    handler = CatenatorEventHandler(
+        catenator(project), str(output), prompt="Explain main", jev_token_limit=1,
+    )
+    handler.update_output()
+    assert project.calls == []
+    assert output.read_text() == "previous output"
+    assert "input budget exceeded" in capsys.readouterr().err

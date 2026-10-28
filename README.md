@@ -65,6 +65,7 @@ Options:
 - `--include-hidden`: Include hidden files and directories, subject to ignore rules
 - `--build NAME`: Select a named build from `.catconfig.yaml`
 - `--token-limit N`: Keep output under N tokens by summarizing least important files
+- `--jev-token-limit N`: Limit estimated Jev input tokens across a run (default 500,000; `0` disables the limit); separate from the output budget
 - `--llm`: Use AI for richer summaries when using --token-limit (requires the `summarize` extra)
 - `--jev`: Use Jev with outlines and docstrings to score whether each file should be verbatim, summarized, or ignored
 - `--full-source`: Send full source to Jev instead of outlines; enables Jev automatically
@@ -263,8 +264,9 @@ By default, Jev receives each eligible file's path and bounded structural
 outline, including first-line Python module, class, and function docstrings.
 Outlines preserve signatures, imports, and selected constants; they are
 limited to 80 lines and 12,000 characters per file. Other formats use the
-existing lightweight extractors described above. Jev asks a separate scoring
-question for each file, sharing context and batching questions across files.
+existing lightweight extractors described above. Jev asks a compact scoring
+question for each file, with one shared rubric per batch. Evidence and questions
+are packed together, avoiding repeated source when question text fills a request.
 The discovery snapshot and ignore rules are the same as normal Catenator.
 
 Use `--full-source` to send every eligible file's full contents instead.
@@ -279,7 +281,7 @@ allow full source. The overview and directory tree can still mention omitted
 files. `--token-limit` can further reduce or omit files to fit the output.
 Without a token limit, the score's inclusion decision still applies.
 
-For larger projects, scoring input is packed into roughly 24,000-token states
+For larger projects, scoring input is packed into at most 24,000-token states
 with a shared overview built from that same input representation. A query's
 space is reserved in each outline batch before packing. Inputs exceeding a
 state are split without dropping characters; their highest part score
@@ -288,19 +290,22 @@ its batch plus shared project context. Request packing also budgets
 question text: up to 26,000 estimated tokens for state plus one question and
 48,000 for state plus all questions. These counts use `cl100k_base` and reserve
 headroom for Jev's different tokenizer and question framing. If Jev still
-rejects the size, Catenator splits the questions, then reduces shared context
+rejects the size, Catenator splits the questions and retains only their candidate
+evidence, then reduces shared context
 and splits candidate text as needed. Candidate text keeps every character,
 the query remains intact, and the highest part score determines inclusion.
 Recovery stops after 12 subdivisions along a failing branch and reports an
 actionable error if the query or metadata cannot fit. Other API failures are
 reported separately and do not trigger size recovery.
 
-`--prompt` enables Jev automatically. Catenator obtains or reuses general
-ratings, then scores all candidate outlines with docstrings directly against
-the query. Query ratings are independent of general importance, so a
-generally ignored file can still be selected for a specific task.
+`--prompt` enables Jev automatically and scores all candidate outlines directly
+against the query. Outline prompts skip general scoring entirely: those ratings
+do not contribute to query judgments. Query ratings are independent of general
+importance, so a generally ignored file can still be selected for a specific task.
+Use `--jev` without a prompt when you want general architecture ratings.
 
-With `--full-source`, prompt scoring builds a general Jev source document
+With `--full-source`, prompt scoring first obtains or reuses general ratings,
+then builds a general Jev source document
 with a high context budget (up to approximately 23,000 tokens, reserving
 space for the query and formatting). Each query question also includes a
 bounded structural description of its candidate, including candidates absent
@@ -322,13 +327,17 @@ between them reuses the matching cache. Both modes record hashes of actual
 source, not hashes of outlines.
 
 The short hash records which contents were rated; it does not force a new
-general judgment after routine edits. Use `--refresh-scores` to reassess every
-file in the selected input mode, for example after a change of architectural
-role. Final output always uses current source. Prompt caches track current
-contents, paths, and query, so edits can refresh prompt scores while retaining
-general ratings. Repeating a query on unchanged inputs requires no API
-requests; a different query also reuses the general ratings. Watch mode
-retains the Jev options and keeps the previous output if scoring fails.
+general judgment after routine edits. Use `--refresh-scores` to reassess the
+selected scoring passes, for example after a change of architectural role.
+Final output always uses current source. Prompt caches track contents, paths,
+query, rubric, and backend settings. Each completed prompt batch is also cached:
+an edit can reuse other batches when their evidence and shared context stay
+unchanged. Even edits that leave outlines identical invalidate the affected
+batch, because its key includes actual source. Changes to batch boundaries or
+shared context can invalidate more batches. Full-source prompt batches depend
+on all source because they use a general document. Repeating a query on unchanged
+inputs requires no API requests. Watch mode retains both token budgets and keeps
+the previous output if scoring fails.
 
 Configuration precedence is process environment, target-project `.env`,
 then `~/.env`, without changing the process environment. `TYPESAFE_URL`
@@ -338,7 +347,30 @@ the estimated USD price per million input tokens.
 
 ### Costs and inspecting scores
 
-Each fresh pass prints its input mode, request count, actual API-reported input
+`--token-limit` bounds the returned document, **not** the Jev work needed to
+rank files. A 12,000-token output can otherwise require millions of API tokens
+when thousands of files are eligible.
+
+`--jev-token-limit` defaults to **500,000 estimated input tokens per run**.
+Catenator counts uncached payloads before each pass and stops before dispatching
+that pass if it cannot fit the remaining allowance. Full-source mode shares
+the allowance between its general and prompt passes; a later pass can be refused
+after earlier work has completed. Recovery attempts consume the same allowance,
+including rejected payloads. The running total accounts for the greater of each
+request's local estimate and reported usage. Estimates use `cl100k_base`, so
+this is not a guaranteed provider billing ceiling; a response can report more
+tokens than estimated. Cache hits spend no allowance.
+
+For an oversized project, narrow the directory, select extensions with
+`--include`, or exclude irrelevant assets in `.catignore`. Downloaded ESP-IDF
+`managed_components/` trees are excluded by default, like other vendored
+dependencies; a named build can explicitly select them. Bundled documentation
+and marketing files remain eligible unless you exclude them. To intentionally
+allow a larger Jev run, use `--jev-token-limit 1000000`; use `0` for unlimited.
+The Python API accepts `jev_token_limit=N` (`0` or `None` for unlimited).
+
+Each fresh pass first prints eligible files, uncached requests, and estimated
+input tokens. Afterward it prints its input mode, request count, API-reported input
 tokens, and estimated USD cost to stderr. The context document remains on
 stdout. Cache hits report no new API cost. Confirmed context-limit failures
 are subdivided into smaller requests; identical failed requests and unrelated
@@ -358,10 +390,9 @@ API-reported input tokens and adds no output-token charge:
 | 100,000 | $0.004200 |
 | 1,000,000 | $0.042000 |
 
-A cold general-plus-query run uses both passes. For example, 30,000 reported
-tokens per pass would total $0.00252; another query with cached general
-scores would cost $0.00126. Actual costs include question text and shared
-context repeated across batches. These estimates cover Jev only; `--llm`
+A cold outline query uses one pass. Full-source queries can use two passes;
+for example, 30,000 reported tokens per pass would total $0.00252. Actual costs
+include question text and shared context repeated across batches. These estimates cover Jev only; `--llm`
 uses its separately priced summary backend. See [TypeSafe's model pricing](https://docs.typesafe.ai/models).
 
 The Python API exposes both raw per-file answers (including confidence and
@@ -372,7 +403,6 @@ from catenator import Catenator
 
 cat = Catenator('/path/to/project')
 context = cat.catenate(prompt='Explain authentication', token_limit=6000)
-print(cat.last_jev_scores['general'])
 print(cat.last_jev_scores['prompt'])
 print(cat.last_jev_report)
 

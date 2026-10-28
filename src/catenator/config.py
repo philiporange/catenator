@@ -1,7 +1,7 @@
 """Configuration settings and defaults for Catenator services and summarization.
 
 This module defines configuration constants for AI summarization and Jev
-integration, including conservative input budgets and bounded context recovery,
+integration, including per-request and run-wide input budgets and bounded recovery,
 along with the immutable JevSettings dataclass representing Typesafe
 Jev API connection parameters and pricing. It also provides the get_jev_settings
 function, which merges configuration values across user home (~/.env),
@@ -26,6 +26,7 @@ JEV_STATE_TOKEN_LIMIT: int = 24000
 JEV_REQUEST_TOKEN_LIMIT: int = 48000
 JEV_PAIR_TOKEN_LIMIT: int = 26000
 JEV_MAX_CONTEXT_SPLITS: int = 12
+DEFAULT_JEV_TOKEN_LIMIT: int = 500_000
 
 
 @dataclass(frozen=True)

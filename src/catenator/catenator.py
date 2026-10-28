@@ -8,9 +8,10 @@ outlines before expanding important files into structural summaries or full
 source. Whole sections, including the overview and tree, share a strict token
 budget. The optional --llm flag enables AI file summaries. --jev scores
 bounded outlines with first-line Python docstrings in batches to rank
-inclusion, reuses general ratings for known file paths, and optionally reranks
-them for --prompt. --full-source sends full source to Jev instead of
-outlines; a non-empty --prompt or full-source selection enables Jev scoring
+inclusion, reuses general ratings for known file paths, and scores --prompt
+directly with independently cached batches. --jev-token-limit bounds estimated
+API inputs separately from the output budget. --full-source sends full source
+instead of outlines; a non-empty --prompt or full-source selection enables Jev scoring
 automatically. Final rendering always uses actual source. API usage and
 estimated cost are reported separately from output.
 
@@ -38,6 +39,8 @@ import yaml
 import pyperclip
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+
+from .config import DEFAULT_JEV_TOKEN_LIMIT
 
 
 class Catenator:
@@ -400,6 +403,7 @@ class Catenator:
         prompt=None,
         refresh_scores=False,
         jev_full_source=False,
+        jev_token_limit=DEFAULT_JEV_TOKEN_LIMIT,
     ):
         """Render source and a factual overview within an optional budget.
 
@@ -410,14 +414,21 @@ class Catenator:
         jev_full_source automatically enables Jev). By default Jev scores
         bounded outlines with first-line Python docstrings; jev_full_source
         sends full source instead. Jev scores use this same snapshot; prompt
-        scoring follows a cached general scoring pass. Final rendering always
-        uses actual source, reduced by structural or LLM summaries as space
-        permits.
+        scoring uses only a query pass unless full source needs general ratings.
+        jev_token_limit bounds API inputs across stages (0 or None disables it).
+        Final rendering always uses actual source, reduced by structural or LLM
+        summaries as space permits.
         """
         from .rendering import render_project
 
         if token_limit is not None and token_limit <= 0:
             raise ValueError("token_limit must be positive")
+        if jev_token_limit is not None and (
+            isinstance(jev_token_limit, bool)
+            or not isinstance(jev_token_limit, int)
+            or jev_token_limit < 0
+        ):
+            raise ValueError("jev_token_limit must be a non-negative integer")
         if prompt is not None:
             if not prompt.strip():
                 raise ValueError("prompt requires non-empty text")
@@ -449,6 +460,7 @@ class Catenator:
                 prompt=prompt,
                 refresh=refresh_scores,
                 full_source=jev_full_source,
+                token_limit=jev_token_limit,
             )
         return render_project(
             self,
@@ -508,6 +520,7 @@ class CatenatorEventHandler(FileSystemEventHandler):
         use_jev=False,
         prompt=None,
         jev_full_source=False,
+        jev_token_limit=DEFAULT_JEV_TOKEN_LIMIT,
     ):
         self.catenator = catenator
         self.output_file = os.path.abspath(output_file)
@@ -519,6 +532,7 @@ class CatenatorEventHandler(FileSystemEventHandler):
         )
         self.prompt = prompt
         self.jev_full_source = jev_full_source
+        self.jev_token_limit = jev_token_limit
         self.cooldown = cooldown
         self.last_update = 0
         self.update_timer = None
@@ -571,6 +585,7 @@ class CatenatorEventHandler(FileSystemEventHandler):
                 use_jev=self.use_jev,
                 prompt=self.prompt,
                 jev_full_source=self.jev_full_source,
+                jev_token_limit=self.jev_token_limit,
             )
         except (JevError, ValueError) as error:
             print(f"Catenator update failed: {error}", file=sys.stderr)
@@ -652,7 +667,7 @@ def main():
     parser.add_argument(
         "--token-limit",
         type=int,
-        help="Max tokens; summarize least important files to fit",
+        help="Max output tokens; does not limit Jev API input tokens",
     )
     parser.add_argument(
         "--llm",
@@ -671,7 +686,13 @@ def main():
     )
     parser.add_argument(
         "--prompt",
-        help="Rerank Jev scores for an instruction or query (automatically enables --jev)",
+        help="Rank files for a query; outlines skip general scoring (enables --jev)",
+    )
+    parser.add_argument(
+        "--jev-token-limit",
+        type=int,
+        default=DEFAULT_JEV_TOKEN_LIMIT,
+        help="Max estimated Jev input tokens per run (default: %(default)s; 0: unlimited)",
     )
     parser.add_argument(
         "--refresh-scores",
@@ -682,6 +703,8 @@ def main():
     args = parser.parse_args()
     if args.token_limit is not None and args.token_limit <= 0:
         parser.error("--token-limit must be positive")
+    if args.jev_token_limit < 0:
+        parser.error("--jev-token-limit must be non-negative")
     if args.watch and not args.output:
         parser.error("--watch requires --output")
     if args.prompt is not None:
@@ -738,6 +761,7 @@ def main():
             prompt=args.prompt,
             refresh_scores=args.refresh_scores,
             jev_full_source=args.full_source,
+            jev_token_limit=args.jev_token_limit,
         )
     except (JevError, ValueError) as error:
         parser.exit(1, f"catenator: {error}\n")
@@ -761,6 +785,7 @@ def main():
                 use_jev=args.jev,
                 prompt=args.prompt,
                 jev_full_source=args.full_source,
+                jev_token_limit=args.jev_token_limit,
             )
             observer = Observer()
             observer.schedule(event_handler, args.directory, recursive=True)

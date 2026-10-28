@@ -110,6 +110,7 @@ target/
 cmake-build-*/
 CMakeFiles/
 CMakeCache.txt
+managed_components/
 
 # -------------------------------------------------------------------
 # Rust

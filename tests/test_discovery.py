@@ -1,4 +1,4 @@
-"""Regression tests for project metadata discovery and traversal boundaries."""
+"""Verify metadata discovery, pruning of downloaded dependencies, and explicit builds."""
 
 import os
 
@@ -147,3 +147,19 @@ def test_overview_can_be_disabled(tmp_path):
         "# Project Overview"
         not in Catenator(str(tmp_path), include_overview=False).catenate()
     )
+
+
+def test_downloaded_esp_idf_components_are_excluded_unless_build_selects_them(tmp_path):
+    write_files(tmp_path, {
+        "main/main.c": "void app_main(void) {}",
+        "main/idf_component.yml": "dependencies:\n  lvgl/lvgl: '*'",
+        "managed_components/lvgl__lvgl/src/lvgl.c": "void lv_init(void) {}",
+    })
+    cat = Catenator(str(tmp_path))
+    assert {p for p, _, _ in cat.collect_files()} == {
+        "main/main.c", "main/idf_component.yml",
+    }
+    cat = Catenator(str(tmp_path), build_config={"whitelist": ["managed_components/"]})
+    assert [p for p, _, _ in cat.collect_files()] == [
+        "managed_components/lvgl__lvgl/src/lvgl.c",
+    ]
