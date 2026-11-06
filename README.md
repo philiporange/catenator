@@ -16,7 +16,7 @@ budget. The default mode runs locally without AI or API credentials.
 - Automatic project facts from READMEs, manifests, and Python source
 - Source locations on structural summaries and project facts
 - Strict token budgets with coverage across source directories
-- Jev ranking from outlines with docstrings, with full source available as an option
+- Luna ranking from outlines with docstrings, with full source available as an option
 - Task-specific ranking with `--prompt`, cached ratings, and API cost reporting
 
 ## Installation
@@ -28,7 +28,7 @@ for budgeted output:
 pip install -e '.[token_counting]'
 ```
 
-Use the `jev` extra for Jev ranking, the `summarize` extra for AI summaries,
+Use the `jev` extra for Luna ranking, the `summarize` extra for AI summaries,
 or both: `pip install -e '.[jev,summarize]'`. Both extras include token
 counting. API credentials are only needed for the corresponding AI feature.
 
@@ -44,8 +44,8 @@ catenator /path/to/your/project --token-limit 6000
 
 Omit `--token-limit` to include all selected source without a budget. For a
 known task, use `--prompt "Explain authentication" --token-limit 12000`.
-This enables Jev ranking from outlines with docstrings; add `--full-source`
-to use full source for ranking. See [Jev file scoring](#jev-file-scoring) for
+This enables Luna ranking from outlines with docstrings; add `--full-source`
+to use full source for ranking. See [Luna file scoring](#luna-file-scoring) for
 credentials, caching, and costs.
 
 Options:
@@ -65,12 +65,12 @@ Options:
 - `--include-hidden`: Include hidden files and directories, subject to ignore rules
 - `--build NAME`: Select a named build from `.catconfig.yaml`
 - `--token-limit N`: Keep output under N tokens by summarizing least important files
-- `--jev-token-limit N`: Limit estimated Jev input tokens across a run (default 500,000; `0` disables the limit); separate from the output budget
+- `--jev-token-limit N`: Limit estimated decision input tokens across a run (default 500,000; `0` disables the limit); separate from the output budget
 - `--llm`: Use AI for richer summaries when using --token-limit (requires the `summarize` extra)
-- `--jev`: Use Jev with outlines and docstrings to score whether each file should be verbatim, summarized, or ignored
-- `--full-source`: Send full source to Jev instead of outlines; enables Jev automatically
-- `--prompt TEXT`: Rank files for an instruction or query; enables Jev automatically
-- `--refresh-scores`: Recompute scores for the selected Jev input mode (requires `--jev`, `--prompt`, or `--full-source`)
+- `--jev`: Use Luna with outlines and docstrings to score whether each file should be verbatim, summarized, or ignored
+- `--full-source`: Send full source to Luna instead of outlines; enables scoring automatically
+- `--prompt TEXT`: Rank files for an instruction or query; enables scoring automatically
+- `--refresh-scores`: Recompute scores for the selected scoring input mode (requires `--jev`, `--prompt`, or `--full-source`)
 
 Example:
 
@@ -245,9 +245,9 @@ Files are labeled `(summary)` or `(outline)` when reduced. The automatic CLI
 extracts structure from its in-memory source snapshot; optional AI file
 summaries are cached in `~/.catenator/summaries/`.
 
-## Jev file scoring
+## Luna file scoring
 
-Install token counting and set `TYPESAFE_API_KEY` in your environment,
+Install token counting and set `CATENATOR_DECISION_API_KEY` in your environment,
 `~/.env`, or the target project's `.env`:
 
 ```sh
@@ -260,17 +260,17 @@ catenator /path/to/project --full-source --token-limit 6000 \
   --prompt "Fix the parser's handling of escaped quotes"
 ```
 
-By default, Jev receives each eligible file's path and bounded structural
+By default, Luna receives each eligible file's path and bounded structural
 outline, including first-line Python module, class, and function docstrings.
 Outlines preserve signatures, imports, and selected constants; they are
 limited to 80 lines and 12,000 characters per file. Other formats use the
-existing lightweight extractors described above. Jev asks a compact scoring
+existing lightweight extractors described above. Luna answers a compact scoring
 question for each file, with one shared rubric per batch. Evidence and questions
 are packed together, avoiding repeated source when question text fills a request.
 The discovery snapshot and ignore rules are the same as normal Catenator.
 
 Use `--full-source` to send every eligible file's full contents instead.
-It enables Jev automatically, so `--jev` is optional alongside it. The selected
+It enables scoring automatically, so `--jev` is optional alongside it. The selected
 ranking input is sent to the configured TypeSafe endpoint; final rendering
 always uses the original source, regardless of the ranking input.
 
@@ -289,7 +289,7 @@ determines inclusion. Every file is evaluated, but each judgment sees only
 its batch plus shared project context. Request packing also budgets
 question text: up to 26,000 estimated tokens for state plus one question and
 48,000 for state plus all questions. These counts use `cl100k_base` and reserve
-headroom for Jev's different tokenizer and question framing. If Jev still
+headroom for the model's tokenizer and question framing. If the proxy still
 rejects the size, Catenator splits the questions and retains only their candidate
 evidence, then reduces shared context
 and splits candidate text as needed. Candidate text keeps every character,
@@ -298,26 +298,26 @@ Recovery stops after 12 subdivisions along a failing branch and reports an
 actionable error if the query or metadata cannot fit. Other API failures are
 reported separately and do not trigger size recovery.
 
-`--prompt` enables Jev automatically and scores all candidate outlines directly
+`--prompt` enables scoring automatically and scores all candidate outlines directly
 against the query. Outline prompts skip general scoring entirely: those ratings
 do not contribute to query judgments. Query ratings are independent of general
 importance, so a generally ignored file can still be selected for a specific task.
 Use `--jev` without a prompt when you want general architecture ratings.
 
 With `--full-source`, prompt scoring first obtains or reuses general ratings,
-then builds a general Jev source document
+then builds a general scored source document
 with a high context budget (up to approximately 23,000 tokens, reserving
 space for the query and formatting). Each query question also includes a
 bounded structural description of its candidate, including candidates absent
 from the general document. Final output uses the original source and prompt
-scores under your requested output budget. Jev does not generate summaries;
+scores under your requested output budget. Luna does not generate summaries;
 `--llm` optionally enables the text-summary backend for final output.
 
 Scores are cached outside the project in `~/.catenator/jev/`. General ratings
 are stored per relative file path with a **16-character SHA-256 prefix** of
 the contents that were rated. Existing files keep their general rating when
 edited; only paths missing from the cache are automatically scored. Adding a
-file asks Jev only about the new file, with the selected project representation
+file asks Luna only about the new file, with the selected project representation
 as context. Removing or excluding a file needs no API call; its rating
 remains available if the path returns. Previously unseen renamed paths are
 new candidates.
@@ -340,14 +340,23 @@ inputs requires no API requests. Watch mode retains both token budgets and keeps
 the previous output if scoring fails.
 
 Configuration precedence is process environment, target-project `.env`,
-then `~/.env`, without changing the process environment. `TYPESAFE_URL`
-defaults to `https://api.typesafe.ai/v1/systemone`, and `TYPESAFE_MODEL`
-defaults to the pinned `jev-1.13.0`. Set `CATENATOR_JEV_INPUT_PRICE` to change
-the estimated USD price per million input tokens.
+then `~/.env`, without changing the process environment.
+`CATENATOR_DECISION_URL` defaults to `http://10.0.0.10:8046/v1/systemone` and
+`CATENATOR_DECISION_MODEL` defaults to `openai/gpt-6-luna`. The gateway translates
+Catenator's Jev-compatible score requests to OpenAI Decisions. The credential is
+a **gateway key** scoped to that model; Catenator does not read or send upstream
+OpenAI or TypeSafe keys. Old `TYPESAFE_*` settings do not select the scoring backend.
+The `--jev` flags, Python option names and cache directory name identify the
+existing scoring workflow. Cache keys include the URL and model, so Jev scores
+are not reused for Luna. Requests contain at most 400 questions.
+
+Set `CATENATOR_DECISION_INPUT_PRICE` only when you want an input-token cost
+estimate at a known USD rate per million tokens. Without it, fresh-call costs
+are reported as unknown rather than using Jev pricing.
 
 ### Costs and inspecting scores
 
-`--token-limit` bounds the returned document, **not** the Jev work needed to
+`--token-limit` bounds the returned document, **not** the scoring work needed to
 rank files. A 12,000-token output can otherwise require millions of API tokens
 when thousands of files are eligible.
 
@@ -366,7 +375,7 @@ For an oversized project, narrow the directory, select extensions with
 `managed_components/` trees are excluded by default, like other vendored
 dependencies; a named build can explicitly select them. Bundled documentation
 and marketing files remain eligible unless you exclude them. To intentionally
-allow a larger Jev run, use `--jev-token-limit 1000000`; use `0` for unlimited.
+allow a larger scoring run, use `--jev-token-limit 1000000`; use `0` for unlimited.
 The Python API accepts `jev_token_limit=N` (`0` or `None` for unlimited).
 
 Each fresh pass first prints eligible files, uncached requests, and estimated
@@ -379,21 +388,9 @@ steps in each pass's report. Only successfully validated responses contribute
 to the usage report; provider billing may include a request whose response
 could not be read.
 
-At the configured default estimate of **$0.042 per million input tokens**,
-these are example costs across all batches of a pass. The estimate uses
-API-reported input tokens and adds no output-token charge:
-
-| API-reported input tokens | Estimated USD cost |
-| ---: | ---: |
-| 10,000 | $0.000420 |
-| 30,000 | $0.001260 |
-| 100,000 | $0.004200 |
-| 1,000,000 | $0.042000 |
-
-A cold outline query uses one pass. Full-source queries can use two passes;
-for example, 30,000 reported tokens per pass would total $0.00252. Actual costs
-include question text and shared context repeated across batches. These estimates cover Jev only; `--llm`
-uses its separately priced summary backend. See [TypeSafe's model pricing](https://docs.typesafe.ai/models).
+Cost estimates, when configured, use API-reported input tokens and exclude
+output-token and cache-specific charges. They are not billing receipts. `--llm`
+uses its separately priced summary backend.
 
 The Python API exposes both raw per-file answers (including confidence and
 probabilities) and per-pass usage:

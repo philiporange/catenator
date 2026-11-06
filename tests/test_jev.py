@@ -34,7 +34,7 @@ def project(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(jev, "JEV_CACHE_DIR", tmp_path / "cache")
     monkeypatch.setattr(
-        jev, "get_jev_settings", lambda _: JevSettings(api_key="test-key")
+        jev, "get_jev_settings", lambda _: JevSettings(api_key="test-key", input_price_per_million=0.042)
     )
 
     def evaluate(client, state, questions):
@@ -986,3 +986,31 @@ def test_watch_retains_input_budget(project, capsys):
     assert project.calls == []
     assert output.read_text() == "previous output"
     assert "input budget exceeded" in capsys.readouterr().err
+
+
+def test_unknown_price_and_proxy_model_cache_isolation(project, monkeypatch):
+    """Unknown Luna costs are not reported as free or reused from another model."""
+    write(project, "main.py", "def main(): pass")
+    monkeypatch.setattr(jev, "get_jev_settings", lambda _: JevSettings(api_key="key"))
+    cat = catenator(project)
+    cat.catenate(prompt="Explain main")
+    assert cat.last_jev_report[0]["estimated_cost_usd"] is None
+    calls = len(project.calls)
+    cat.catenate(prompt="Explain main")
+    assert len(project.calls) == calls
+    monkeypatch.setattr(jev, "get_jev_settings", lambda _: JevSettings(api_key="key", model="typesafe/jev"))
+    cat.catenate(prompt="Explain main")
+    assert len(project.calls) > calls
+
+
+def test_proxy_question_count_limit(project, monkeypatch):
+    """A large set of tiny files must not exceed Luna's 400-question cap."""
+    monkeypatch.setattr(jev, "JEV_REQUEST_TOKEN_LIMIT", 10_000_000)
+    monkeypatch.setattr(jev, "JEV_STATE_TOKEN_LIMIT", 10_000_000)
+    for index in range(401):
+        write(project, f"file_{index}.py", "x = 1")
+    cat = catenator(project)
+    cat.catenate(prompt="Explain the project")
+    assert len(project.calls) == 2
+    assert all(len(call["questions"]) <= 400 for call in project.calls)
+    assert len(cat.last_jev_scores["prompt"]) == 401

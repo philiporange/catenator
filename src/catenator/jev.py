@@ -1,4 +1,4 @@
-"""Score architecture or task relevance with bounded, cached Jev requests.
+"""Score architecture or task relevance with bounded Luna requests through the proxy.
 
 Scoring uses bounded outlines with docstrings by default, adding the query
 directly without an unused general pass. A shared rubric and joint evidence /
@@ -12,7 +12,7 @@ questions or evidence; unrelated errors fail immediately. General ratings
 persist by path with a short hash of the actual source; only new paths are
 scored until explicitly refreshed. Input modes have
 separate caches, and query caches track current source contents. Each pass
-reports its input mode, fresh token usage, and estimated dollar cost.
+reports its input mode and fresh token usage, estimating cost only with a configured rate.
 """
 
 import copy
@@ -26,6 +26,7 @@ import tempfile
 
 from .config import (
     JEV_MAX_CONTEXT_SPLITS,
+    JEV_MAX_QUESTIONS,
     JEV_PAIR_TOKEN_LIMIT,
     JEV_REQUEST_TOKEN_LIMIT,
     JEV_STATE_TOKEN_LIMIT,
@@ -76,7 +77,7 @@ def _question(path, content, prompt=False, full_source=False):
 
 
 def _general_states(
-    cat, files, query=None, full_source=True, model="jev-1.13.0", candidates=None,
+    cat, files, query=None, full_source=True, model="openai/gpt-6-luna", candidates=None,
 ):
     """Pack evidence and its questions together so source is sent only once."""
     entries = [
@@ -299,8 +300,10 @@ def _requests(cat, states, files, model, prompt=False, full_source=False):
                 continue
             if (
                 questions
-                and cost({**questions, question_id: question})
-                > JEV_REQUEST_TOKEN_LIMIT
+                and (
+                    len(questions) >= JEV_MAX_QUESTIONS
+                    or cost({**questions, question_id: question}) > JEV_REQUEST_TOKEN_LIMIT
+                )
             ):
                 requests.append((state, questions, targets))
                 questions, targets = {}, {}
@@ -433,7 +436,7 @@ def _run_pass(
     cat.last_jev_report.append(report)
     if cached is not None or not requests:
         print(
-            f"Jev {stage} ({input_mode}): cached scores for "
+            f"Decisions [{client.settings.model}] {stage} ({input_mode}): cached scores for "
             f"{report['cached_files']} files; no API cost.",
             file=sys.stderr,
         )
@@ -481,7 +484,7 @@ def _run_pass(
         budget.estimate(request, client.settings.model) for request in fresh_requests
     )
     print(
-        f"Jev {stage} ({input_mode}) plan: {len(files):,} files, "
+        f"Decisions [{client.settings.model}] {stage} ({input_mode}) plan: {len(files):,} files, "
         f"{len(fresh_requests)} uncached requests, "
         f"~{report['estimated_input_tokens']:,} input tokens.",
         file=sys.stderr,
@@ -545,18 +548,20 @@ def _run_pass(
                 batch_scores = {}
     finally:
         report["scored_files"] = len(fresh_scores)
+        price = client.settings.input_price_per_million
         report["estimated_cost_usd"] = (
-            report["input_tokens"]
-            * client.settings.input_price_per_million
-            / 1_000_000
+            report["input_tokens"] * price / 1_000_000 if price is not None else None
+        )
+        cost_note = (
+            f"estimated ${report['estimated_cost_usd']:.6f} at ${price:g}/M input tokens."
+            if price is not None else "cost unknown (no input price configured)."
         )
         print(
-            f"Jev {stage} ({input_mode}): {report['cached_files']} cached, "
+            f"Decisions [{client.settings.model}] {stage} ({input_mode}): {report['cached_files']} cached, "
             f"{len(fresh_scores)} scored; "
             f"{report['requests']} requests, "
             f"{report['input_tokens']:,} input tokens, "
-            f"estimated ${report['estimated_cost_usd']:.6f} "
-            f"at ${client.settings.input_price_per_million:g}/M input tokens.",
+            f"{cost_note}",
             file=sys.stderr,
         )
     if use_cache:

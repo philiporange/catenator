@@ -44,7 +44,7 @@ def _build_sample_questions() -> dict:
 
 def _build_valid_api_response() -> dict:
     return {
-        "model": "jev-1.13.0",
+        "model": "openai/gpt-6-luna",
         "usage": {"input_tokens": 1250},
         "answers": {
             "q_catenator": {
@@ -67,16 +67,16 @@ def test_jev_settings_repr_masks_api_key() -> None:
     settings = JevSettings(api_key="super-secret-key-xyz")
     assert "super-secret-key-xyz" not in repr(settings)
     assert settings.api_key == "super-secret-key-xyz"
-    assert settings.url == "https://api.typesafe.ai/v1/systemone"
-    assert settings.model == "jev-1.13.0"
-    assert settings.input_price_per_million == 0.042
+    assert settings.url == "http://10.0.0.10:8046/v1/systemone"
+    assert settings.model == "openai/gpt-6-luna"
+    assert settings.input_price_per_million is None
     assert settings.timeout == 60.0
 
 
 def test_request_shape_and_field_preservation() -> None:
     questions = _build_sample_questions()
     state_content = "def catenate(): pass"
-    settings = JevSettings(api_key="typesafe-bearer-token")
+    settings = JevSettings(api_key="gateway-bearer-token")
 
     mock_session = MagicMock(spec=requests.Session)
     mock_response = MagicMock()
@@ -90,17 +90,17 @@ def test_request_shape_and_field_preservation() -> None:
     assert mock_session.post.call_count == 1
     call_args, call_kwargs = mock_session.post.call_args
 
-    assert call_args[0] == "https://api.typesafe.ai/v1/systemone"
+    assert call_args[0] == "http://10.0.0.10:8046/v1/systemone"
     assert call_kwargs["timeout"] == 60.0
     assert call_kwargs["allow_redirects"] is False
 
     headers = call_kwargs["headers"]
-    assert headers["Authorization"] == "Bearer typesafe-bearer-token"
+    assert headers["Authorization"] == "Bearer gateway-bearer-token"
     assert headers["Content-Type"] == "application/json"
 
     payload = call_kwargs["json"]
     assert payload["state"] == state_content
-    assert payload["model"] == "jev-1.13.0"
+    assert payload["model"] == "openai/gpt-6-luna"
     assert payload["questions"] == questions
 
     # Verify per-file paths are present in instructions, not question IDs
@@ -113,7 +113,7 @@ def test_request_shape_and_field_preservation() -> None:
     )
 
     # Verify preserved fields in result
-    assert result["model"] == "jev-1.13.0"
+    assert result["model"] == "openai/gpt-6-luna"
     assert result["usage"]["input_tokens"] == 1250
     assert result["answers"]["q_catenator"]["score"] == 2
     assert result["answers"]["q_catenator"]["probabilities"] == {
@@ -136,7 +136,7 @@ def test_missing_api_key_refusal() -> None:
             client.evaluate("state", _build_sample_questions())
 
         msg = str(exc_info.value)
-        assert "TYPESAFE_API_KEY" in msg
+        assert "CATENATOR_DECISION_API_KEY" in msg
         assert "environment or ~/.env" in msg
 
     assert mock_session.post.call_count == 0
@@ -438,43 +438,43 @@ def test_env_precedence_and_isolation(
 
     # Clear relevant env vars from active process
     for k in (
-        "TYPESAFE_API_KEY",
-        "TYPESAFE_URL",
-        "TYPESAFE_MODEL",
-        "CATENATOR_JEV_INPUT_PRICE",
+        "CATENATOR_DECISION_API_KEY",
+        "CATENATOR_DECISION_URL",
+        "CATENATOR_DECISION_MODEL",
+        "CATENATOR_DECISION_INPUT_PRICE",
     ):
         monkeypatch.delenv(k, raising=False)
 
     # 1. Base defaults when nothing is set
     default_settings = get_jev_settings()
     assert default_settings.api_key == ""
-    assert default_settings.url == "https://api.typesafe.ai/v1/systemone"
-    assert default_settings.model == "jev-1.13.0"
-    assert default_settings.input_price_per_million == 0.042
+    assert default_settings.url == "http://10.0.0.10:8046/v1/systemone"
+    assert default_settings.model == "openai/gpt-6-luna"
+    assert default_settings.input_price_per_million is None
     assert default_settings.timeout == 60.0
 
     # 2. ~/.env configuration
     home_env = fake_home / ".env"
     home_env.write_text(
-        "TYPESAFE_API_KEY=home-key\n"
-        "TYPESAFE_MODEL=jev-home-model\n"
-        "CATENATOR_JEV_INPUT_PRICE=0.050\n"
+        "CATENATOR_DECISION_API_KEY=home-key\n"
+        "CATENATOR_DECISION_MODEL=jev-home-model\n"
+        "CATENATOR_DECISION_INPUT_PRICE=0.050\n"
     )
 
     settings_from_home = get_jev_settings()
     assert settings_from_home.api_key == "home-key"
     assert settings_from_home.model == "jev-home-model"
     assert settings_from_home.input_price_per_million == 0.050
-    assert settings_from_home.url == "https://api.typesafe.ai/v1/systemone"
+    assert settings_from_home.url == "http://10.0.0.10:8046/v1/systemone"
 
     # 3. <project>/.env overrides ~/.env
     proj_a = tmp_path / "project_a"
     proj_a.mkdir()
     proj_a_env = proj_a / ".env"
     proj_a_env.write_text(
-        "TYPESAFE_API_KEY=proj-a-key\n"
-        "TYPESAFE_MODEL=jev-proj-a\n"
-        "CATENATOR_JEV_INPUT_PRICE=0.060\n"
+        "CATENATOR_DECISION_API_KEY=proj-a-key\n"
+        "CATENATOR_DECISION_MODEL=jev-proj-a\n"
+        "CATENATOR_DECISION_INPUT_PRICE=0.060\n"
     )
 
     settings_proj_a = get_jev_settings(proj_a)
@@ -486,7 +486,7 @@ def test_env_precedence_and_isolation(
     proj_b = tmp_path / "project_b"
     proj_b.mkdir()
     proj_b_env = proj_b / ".env"
-    proj_b_env.write_text("TYPESAFE_API_KEY=proj-b-key\n")
+    proj_b_env.write_text("CATENATOR_DECISION_API_KEY=proj-b-key\n")
 
     settings_proj_b = get_jev_settings(proj_b)
     assert settings_proj_b.api_key == "proj-b-key"
@@ -495,9 +495,9 @@ def test_env_precedence_and_isolation(
     assert settings_proj_b.input_price_per_million == 0.050
 
     # 5. Explicit os.environ wins over both ~/.env and project .env
-    monkeypatch.setenv("TYPESAFE_API_KEY", "env-key")
-    monkeypatch.setenv("TYPESAFE_MODEL", "jev-env-model")
-    monkeypatch.setenv("CATENATOR_JEV_INPUT_PRICE", "0.080")
+    monkeypatch.setenv("CATENATOR_DECISION_API_KEY", "env-key")
+    monkeypatch.setenv("CATENATOR_DECISION_MODEL", "jev-env-model")
+    monkeypatch.setenv("CATENATOR_DECISION_INPUT_PRICE", "0.080")
 
     settings_env_override = get_jev_settings(proj_a)
     assert settings_env_override.api_key == "env-key"
@@ -505,20 +505,20 @@ def test_env_precedence_and_isolation(
     assert settings_env_override.input_price_per_million == 0.080
 
     # 6. Empty values in env fallback to defaults (except api_key stays empty)
-    monkeypatch.setenv("TYPESAFE_API_KEY", "")
-    monkeypatch.setenv("TYPESAFE_URL", "")
-    monkeypatch.setenv("TYPESAFE_MODEL", "")
-    monkeypatch.setenv("CATENATOR_JEV_INPUT_PRICE", "")
+    monkeypatch.setenv("CATENATOR_DECISION_API_KEY", "")
+    monkeypatch.setenv("CATENATOR_DECISION_URL", "")
+    monkeypatch.setenv("CATENATOR_DECISION_MODEL", "")
+    monkeypatch.setenv("CATENATOR_DECISION_INPUT_PRICE", "")
 
     settings_empty = get_jev_settings(proj_a)
     assert settings_empty.api_key == ""
-    assert settings_empty.url == "https://api.typesafe.ai/v1/systemone"
-    assert settings_empty.model == "jev-1.13.0"
-    assert settings_empty.input_price_per_million == 0.042
+    assert settings_empty.url == "http://10.0.0.10:8046/v1/systemone"
+    assert settings_empty.model == "openai/gpt-6-luna"
+    assert settings_empty.input_price_per_million is None
 
     # 7. Invalid price rejection
     for bad_price in ("not-a-number", "-0.01", "nan", "inf", "-inf"):
-        monkeypatch.setenv("CATENATOR_JEV_INPUT_PRICE", bad_price)
+        monkeypatch.setenv("CATENATOR_DECISION_INPUT_PRICE", bad_price)
         with pytest.raises(ValueError):
             get_jev_settings(proj_a)
 

@@ -1,4 +1,4 @@
-"""HTTP client and response validation for the Typesafe Jev API.
+"""HTTP client and response validation for the decision_provider proxy.
 
 This module dispatches scoring requests, distinguishes explicit context-limit
 responses from other sanitized HTTP failures, and validates successful response
@@ -46,7 +46,7 @@ def _is_context_error(data: Any) -> bool:
 
 
 class JevClient:
-    """Client for evaluating state against questions using the Typesafe Jev API."""
+    """Client for evaluating state against questions using the decision_provider proxy."""
 
     def __init__(
         self,
@@ -59,14 +59,14 @@ class JevClient:
     def evaluate(
         self, state: Any, questions: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Evaluate a state representation against questions via Typesafe Jev API.
+        """Evaluate a state representation against questions via decision_provider proxy.
 
         Makes exactly one POST request without retries or redirects. Validates
         all response fields, ensuring every question receives a valid score answer.
         """
         if not self.settings.api_key or not self.settings.api_key.strip():
             raise JevError(
-                "Missing Typesafe API key: set TYPESAFE_API_KEY in environment or ~/.env"
+                "Missing gateway API key: set CATENATOR_DECISION_API_KEY in environment or ~/.env"
             )
 
         if not questions or not isinstance(questions, dict):

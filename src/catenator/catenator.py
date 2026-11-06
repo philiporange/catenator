@@ -6,7 +6,7 @@ and manifests. Files are discovered once, in stable order, and ignored trees
 are pruned before descent. Budgeted output covers the main directories with
 outlines before expanding important files into structural summaries or full
 source. Whole sections, including the overview and tree, share a strict token
-budget. The optional --llm flag enables AI file summaries. --jev scores
+budget. The optional --llm flag enables AI file summaries. --jev uses Luna through decision_provider to score
 bounded outlines with first-line Python docstrings in batches to rank
 inclusion, reuses general ratings for known file paths, and scores --prompt
 directly with independently cached batches. --jev-token-limit bounds estimated
@@ -677,7 +677,7 @@ def main():
     parser.add_argument(
         "--jev",
         action="store_true",
-        help="Score file inclusion from outlines with docstrings (requires TYPESAFE_API_KEY)",
+        help="Score file inclusion from outlines with docstrings (requires CATENATOR_DECISION_API_KEY)",
     )
     parser.add_argument(
         "--full-source",
